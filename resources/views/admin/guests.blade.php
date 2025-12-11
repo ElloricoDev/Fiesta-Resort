@@ -15,8 +15,7 @@
     title="Guests"
     search-placeholder="Search guest..."
     search-id="searchInput"
-    add-button-text="Add Guest"
-    add-button-id="addGuestBtn"
+    :show-add-button="false"
   />
 
   <div class="guests-section">
@@ -41,7 +40,7 @@
 
   <x-admin.modal 
     id="guestModal"
-    title="Add Guest"
+    title="Edit Guest"
     form-id="guestForm"
     submit-button-text="Save Guest"
     cancel-button-text="Cancel"
@@ -69,25 +68,31 @@
         id="guestPhone"
         type="tel"
         placeholder="(555) 123-4567"
-        :required="true"
+        :required="false"
       />
       <x-admin.form-group 
         label="Start Since"
         id="startSince"
         type="date"
-        :required="true"
+        :required="false"
       />
     </x-admin.form-row>
 
-    <x-admin.form-group 
-      label="Total Stays"
-      id="totalStays"
-      type="number"
-      placeholder="0"
-      :required="true"
-      :min="0"
-      class="full-width"
-    />
+    <div class="form-group full-width" style="margin-top: 16px;">
+      <small style="color: #6b7280; font-size: 12px;">
+        Note: Total stays is automatically calculated from reservations and cannot be edited.
+      </small>
+    </div>
   </x-admin.modal>
+
+  <!-- Delete Confirmation Modal -->
+  <x-admin.confirmation-modal 
+    id="deleteGuestModal"
+    title="Delete Guest"
+    message="Are you sure you want to delete this guest? This action cannot be undone."
+    confirm-text="Delete"
+    cancel-text="Cancel"
+    confirm-button-class="logout-modal-btn-delete"
+  />
 @endsection
 

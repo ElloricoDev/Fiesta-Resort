@@ -1,7 +1,20 @@
 window.addEventListener("DOMContentLoaded", () => {
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-  const userEmail = localStorage.getItem("userEmail");
-  const userRole = localStorage.getItem("userRole");
+  // Check Laravel auth first, then fall back to localStorage (for dummy users)
+  const isLoggedIn = window.laravelAuth?.isAuthenticated || localStorage.getItem("isLoggedIn") === "true";
+  const userEmail = window.laravelAuth?.user?.email || localStorage.getItem("userEmail");
+  const userName = window.laravelAuth?.user?.name || localStorage.getItem("userName");
+  const userRole = window.laravelAuth?.user?.role || localStorage.getItem("userRole");
+
+  // Prevent admins from accessing client pages (server-side middleware is primary, this is backup)
+  if (isLoggedIn && userRole === 'admin') {
+    if (window.showError) {
+      window.showError("Admins cannot access client pages. Redirecting to admin dashboard...");
+    }
+    setTimeout(() => {
+      window.location.href = "/admin/dashboard";
+    }, 1000);
+    return;
+  }
 
   updateUIForLoginState(isLoggedIn, userEmail, userRole);
   updateMyBookingsVisibility(isLoggedIn);
@@ -31,10 +44,10 @@ function updateUIForLoginState(isLoggedIn, userEmail, userRole) {
     if (loginBtn) loginBtn.style.display = "none";
     if (userMenu) userMenu.style.display = "block";
 
-    if (userName && userEmail) {
-      const name = userEmail.split("@")[0];
-      userName.textContent =
-        name.charAt(0).toUpperCase() + name.slice(1).replace(/[._-]/g, " ");
+    if (userName) {
+      // Use Laravel auth name if available, otherwise use localStorage name, otherwise derive from email
+      const name = window.laravelAuth?.user?.name || localStorage.getItem("userName") || (userEmail ? userEmail.split("@")[0] : "User");
+      userName.textContent = name;
     }
 
     if (userRole === "admin" && userDropdown) {
@@ -224,6 +237,25 @@ function hideLogoutModal() {
 }
 
 function performLogout() {
+  // If using Laravel auth, submit logout form
+  if (window.laravelAuth?.isAuthenticated) {
+    // Create a form to submit POST logout request
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = window.laravelAuth.logoutUrl || "/logout";
+    
+    const csrfToken = document.createElement("input");
+    csrfToken.type = "hidden";
+    csrfToken.name = "_token";
+    csrfToken.value = window.laravelAuth.csrfToken || "";
+    form.appendChild(csrfToken);
+    
+    document.body.appendChild(form);
+    form.submit();
+    return;
+  }
+  
+  // Otherwise, clear localStorage (for dummy users)
   localStorage.removeItem("isLoggedIn");
   localStorage.removeItem("userEmail");
   localStorage.removeItem("userRole");
@@ -236,7 +268,7 @@ function performLogout() {
   updateUIForLoginState(false, null, null);
   updateMyBookingsVisibility(false);
   
-  // Reload page to update UI - navigation handled by HTML links
+  // Reload page to update UI
   window.location.reload();
 }
 
@@ -247,7 +279,7 @@ function setupSearchHandlers() {
 
   if (searchBtn) {
     searchBtn.addEventListener("click", () => {
-      alert("Search functionality will be implemented with backend integration.");
+      if (window.showInfo) window.showInfo("Search functionality will be implemented with backend integration.");
     });
   }
 
@@ -365,9 +397,9 @@ if (contactForm) {
       message,
     });
 
-    alert(
-      `Thank you for contacting us, ${fullName}!\n\nWe have received your message and will get back to you shortly at ${emailAddress}.`
-    );
+    if (window.showSuccess) {
+      window.showSuccess(`Thank you for contacting us, ${fullName}! We have received your message and will get back to you shortly at ${emailAddress}.`);
+    }
 
     contactForm.reset();
   });

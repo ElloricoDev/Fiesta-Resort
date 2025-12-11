@@ -116,7 +116,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
       if (!isLoggedIn) {
-        alert("Please login to book a hotel");
+        if (window.showError) window.showError("Please login to book a hotel");
         // Navigation handled by HTML - redirect to login
         const loginLink = document.createElement("a");
         loginLink.href = "/login";
@@ -124,7 +124,7 @@ document.addEventListener("DOMContentLoaded", function () {
         loginLink.click();
         document.body.removeChild(loginLink);
       } else {
-        alert(`Booking ${hotelName} at ${hotelPrice}. This feature will be implemented soon!`);
+        if (window.showInfo) window.showInfo(`Booking ${hotelName} at ${hotelPrice}. This feature will be implemented soon!`);
       }
     });
   });

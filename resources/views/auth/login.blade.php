@@ -21,6 +21,16 @@
         </div>
       @endif
 
+      @if ($errors->any())
+        <div class="alert alert-danger" style="background-color: #fee; color: #c33; padding: 12px; border-radius: 6px; margin-bottom: 20px;">
+          <ul style="margin: 0; padding-left: 20px;">
+            @foreach ($errors->all() as $error)
+              <li>{{ $error }}</li>
+            @endforeach
+          </ul>
+        </div>
+      @endif
+
       <form id="loginForm" class="login-form" method="POST" action="{{ route('login') }}">
         @csrf
 

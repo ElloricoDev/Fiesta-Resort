@@ -110,45 +110,11 @@ if (loginForm) {
       return;
     }
 
-    // Initialize dummy users
-    initializeDummyUsers();
-
-    // Try dummy user authentication first (for testing)
-    const dummyUser = authenticateDummyUser(email, password);
-    if (dummyUser) {
-      // Set login state in localStorage (behavior only, no routing)
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userEmail", dummyUser.email);
-      localStorage.setItem("userName", dummyUser.name);
-      localStorage.setItem("userRole", dummyUser.role);
-      localStorage.setItem("lastLogin", new Date().toISOString());
-
-      if (rememberMeCheckbox.checked) {
-        localStorage.setItem("rememberedEmail", email);
-        localStorage.setItem("rememberMe", "true");
-      } else {
-        localStorage.removeItem("rememberedEmail");
-        localStorage.removeItem("rememberMe");
-      }
-
-      // Prevent form submission for dummy users and redirect based on role
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      
-      // Small delay to ensure preventDefault is processed
-      setTimeout(() => {
-        // Redirect based on role
-        if (dummyUser.role === "admin") {
-          window.location.href = "/admin/dashboard";
-        } else {
-          window.location.href = "/";
-        }
-      }, 10);
-      return false;
-    }
-
-    // If not dummy user, proceed with Laravel authentication
+    // Let Laravel handle authentication - don't intercept for dummy users
+    // Dummy users are only for testing when Laravel auth is not available
+    // Since we have database authentication, always let Laravel handle it
+    
+    // Store remember me preference for next time
     if (rememberMeCheckbox.checked) {
       localStorage.setItem("rememberedEmail", email);
       localStorage.setItem("rememberMe", "true");
@@ -156,6 +122,8 @@ if (loginForm) {
       localStorage.removeItem("rememberedEmail");
       localStorage.removeItem("rememberMe");
     }
+    // Allow form to submit normally for Laravel authentication
+    // Don't prevent default - let the form submit to Laravel
   });
 
   // Initialize dummy users on page load

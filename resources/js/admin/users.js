@@ -1,47 +1,7 @@
 const usersTableBody = document.getElementById("usersTableBody");
 
 if (usersTableBody) {
-  // Load users from localStorage or use default dummy data
-  let storedUsers = localStorage.getItem("adminUsersData");
-  let users = storedUsers
-    ? JSON.parse(storedUsers).map((u, index) => ({
-        id: index + 1,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        status: u.status,
-      }))
-    : [
-        {
-          id: 1,
-          name: "Olivia Martin",
-          email: "olivia.martin@gmail.com",
-          role: "admin",
-          status: "active",
-        },
-        {
-          id: 2,
-          name: "Emily Carter",
-          email: "emily.carter@example.com",
-          role: "staff",
-          status: "inactive",
-        },
-        {
-          id: 3,
-          name: "David Lee",
-          email: "david.lee@example.com",
-          role: "admin",
-          status: "active",
-        },
-        {
-          id: 4,
-          name: "Sophia Cruz",
-          email: "sophia.cruz@example.com",
-          role: "staff",
-          status: "active",
-        },
-      ];
-
+  let users = [];
   let searchQuery = "";
   let editingId = null;
 
@@ -53,6 +13,15 @@ if (usersTableBody) {
   const closeModalBtn = document.getElementById("closeModalBtn");
   const cancelModalBtn = document.getElementById("cancelModalBtn");
   const userForm = document.getElementById("userForm");
+
+  // API base URL
+  const apiBaseUrl = "/admin/api/users";
+
+  // Get CSRF token from meta tag
+  function getCsrfToken() {
+    const metaTag = document.querySelector('meta[name="csrf-token"]');
+    return metaTag ? metaTag.getAttribute("content") : "";
+  }
 
   function getInitials(name) {
     return name
@@ -67,30 +36,49 @@ if (usersTableBody) {
     const roleMap = {
       admin: "Admin",
       staff: "Staff",
+      user: "User",
     };
     return roleMap[role] || role;
   }
 
   function formatStatus(status) {
-    return status.charAt(0).toUpperCase() + status.slice(1);
+    return status ? status.charAt(0).toUpperCase() + status.slice(1) : "Active";
   }
 
-  function getFilteredUsers() {
-    return users.filter((user) => {
-      const query = searchQuery.toLowerCase();
-      return (
-        query === "" ||
-        user.name.toLowerCase().includes(query) ||
-        user.email.toLowerCase().includes(query) ||
-        user.role.toLowerCase().includes(query)
-      );
-    });
+  // Fetch users from API
+  async function fetchUsers() {
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) {
+        params.append("search", searchQuery);
+      }
+
+      const response = await fetch(`${apiBaseUrl}?${params.toString()}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch users");
+      }
+
+      const result = await response.json();
+      users = result.data || [];
+      renderUsers();
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      if (window.showError) {
+        window.showError("Failed to load users. Please refresh the page.");
+      }
+    }
   }
 
   function renderUsers() {
-    const filteredUsers = getFilteredUsers();
-
-    if (filteredUsers.length === 0) {
+    if (users.length === 0) {
       usersTableBody.innerHTML = "";
       if (emptyState) {
         emptyState.style.display = "block";
@@ -102,7 +90,7 @@ if (usersTableBody) {
       emptyState.style.display = "none";
     }
 
-    usersTableBody.innerHTML = filteredUsers
+    usersTableBody.innerHTML = users
       .map(
         (user) => `
       <tr>
@@ -110,14 +98,14 @@ if (usersTableBody) {
           <div class="user-cell">
             <div class="user-avatar">${getInitials(user.name)}</div>
             <div class="user-info">
-              <div class="user-name">${user.name}</div>
-              <div class="user-email">${user.email}</div>
+              <div class="user-name">${escapeHtml(user.name)}</div>
+              <div class="user-email">${escapeHtml(user.email)}</div>
             </div>
           </div>
         </td>
         <td>${formatRole(user.role)}</td>
         <td>
-          <span class="status-badge ${user.status}">
+          <span class="status-badge ${user.status || 'active'}">
             ${formatStatus(user.status)}
           </span>
         </td>
@@ -137,6 +125,12 @@ if (usersTableBody) {
       .join("");
   }
 
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   usersTableBody.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
@@ -149,7 +143,7 @@ if (usersTableBody) {
     if (action === "edit") {
       editUser(id);
     } else if (action === "delete") {
-      deleteUser(id);
+      showDeleteModal(id);
     }
   });
 
@@ -158,117 +152,212 @@ if (usersTableBody) {
     if (!user) return;
 
     editingId = id;
-    modalTitle.textContent = "Edit User";
-    document.getElementById("userName").value = user.name;
-    document.getElementById("userEmail").value = user.email;
-    document.getElementById("role").value = user.role;
-    document.getElementById("status").value = user.status;
-    const passwordInput = document.getElementById("password");
-    passwordInput.value = "";
-    passwordInput.required = false;
-    userModal.classList.add("show");
+    if (modalTitle) modalTitle.textContent = "Edit User";
+    if (userForm) {
+      document.getElementById("userName").value = user.name || "";
+      document.getElementById("userEmail").value = user.email || "";
+      document.getElementById("role").value = user.role || "user";
+      document.getElementById("status").value = user.status || "active";
+      document.getElementById("password").value = "";
+    }
+    if (userModal) userModal.classList.add("show");
   }
 
-  function deleteUser(id) {
-    const user = users.find((u) => u.id === id);
-    if (!user) return;
+  function showDeleteModal(id) {
+    const deleteModal = document.getElementById("deleteUserModal");
+    const deleteModalConfirmBtn = document.getElementById("deleteUserModalConfirmBtn");
+    const deleteModalCancelBtn = document.getElementById("deleteUserModalCancelBtn");
 
-    if (confirm(`Are you sure you want to delete ${user.name}?`)) {
-      users = users.filter((u) => u.id !== id);
-      renderUsers();
-      alert("User deleted successfully!");
+    if (deleteModal) {
+      deleteModal.classList.add("show");
+
+      // Remove existing event listeners by cloning
+      const newConfirmBtn = deleteModalConfirmBtn.cloneNode(true);
+      deleteModalConfirmBtn.parentNode.replaceChild(newConfirmBtn, deleteModalConfirmBtn);
+
+      newConfirmBtn.addEventListener("click", async () => {
+        await deleteUser(id);
+        deleteModal.classList.remove("show");
+      });
+
+      if (deleteModalCancelBtn) {
+        deleteModalCancelBtn.addEventListener("click", () => {
+          deleteModal.classList.remove("show");
+        });
+      }
+
+      deleteModal.addEventListener("click", (event) => {
+        if (event.target === deleteModal) {
+          deleteModal.classList.remove("show");
+        }
+      });
     }
   }
 
-  if (searchInput) {
-    searchInput.addEventListener("input", (event) => {
-      searchQuery = event.target.value;
-      renderUsers();
-    });
+  async function deleteUser(id) {
+    try {
+      const response = await fetch(`${apiBaseUrl}/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRF-TOKEN": getCsrfToken(),
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to delete user");
+      }
+
+      if (window.showSuccess) {
+        window.showSuccess(result.message || "User deleted successfully");
+      }
+
+      await fetchUsers();
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      if (window.showError) {
+        window.showError(error.message || "Failed to delete user. Please try again.");
+      }
+    }
   }
 
   if (addUserBtn) {
     addUserBtn.addEventListener("click", () => {
       editingId = null;
-      modalTitle.textContent = "Add User";
-      userForm.reset();
-      const passwordInput = document.getElementById("password");
-      passwordInput.required = true;
-      userModal.classList.add("show");
+      if (modalTitle) modalTitle.textContent = "Add User";
+      if (userForm) {
+        userForm.reset();
+        document.getElementById("status").value = "active";
+      }
+      if (userModal) userModal.classList.add("show");
     });
   }
 
-  function closeModal() {
-    userModal.classList.remove("show");
-    userForm.reset();
-    editingId = null;
-  }
-
   if (closeModalBtn) {
-    closeModalBtn.addEventListener("click", closeModal);
+    closeModalBtn.addEventListener("click", () => {
+      if (userModal) userModal.classList.remove("show");
+      if (userForm) userForm.reset();
+      editingId = null;
+    });
   }
 
   if (cancelModalBtn) {
-    cancelModalBtn.addEventListener("click", closeModal);
+    cancelModalBtn.addEventListener("click", () => {
+      if (userModal) userModal.classList.remove("show");
+      if (userForm) userForm.reset();
+      editingId = null;
+    });
   }
 
-  userModal.addEventListener("click", (event) => {
-    if (event.target === userModal) {
-      closeModal();
-    }
-  });
+  if (userModal) {
+    userModal.addEventListener("click", (event) => {
+      if (event.target === userModal) {
+        userModal.classList.remove("show");
+        if (userForm) userForm.reset();
+        editingId = null;
+      }
+    });
+  }
 
   if (userForm) {
-    userForm.addEventListener("submit", (event) => {
+    userForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
-      const passwordInput = document.getElementById("password");
       const formData = {
         name: document.getElementById("userName").value.trim(),
         email: document.getElementById("userEmail").value.trim(),
         role: document.getElementById("role").value,
         status: document.getElementById("status").value,
-        password: passwordInput.value,
+        password: document.getElementById("password").value,
       };
+
+      // Validation
+      if (!formData.name) {
+        if (window.showError) window.showError("Name is required.");
+        return;
+      }
+
+      if (!formData.email) {
+        if (window.showError) window.showError("Email is required.");
+        return;
+      }
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
-        alert("Please enter a valid email address.");
+        if (window.showError) window.showError("Please enter a valid email address.");
         return;
       }
 
-      if (!editingId && formData.password.length < 6) {
-        alert("Password must be at least 6 characters.");
+      if (!editingId && !formData.password) {
+        if (window.showError) window.showError("Password is required for new users.");
         return;
       }
 
-      if (editingId) {
-        const index = users.findIndex((u) => u.id === editingId);
-        if (index !== -1) {
-          users[index] = {
-            ...users[index],
-            name: formData.name,
-            email: formData.email,
-            role: formData.role,
-            status: formData.status,
-          };
-          if (formData.password) {
-            users[index].password = formData.password;
-          }
+      if (formData.password && formData.password.length < 6) {
+        if (window.showError) window.showError("Password must be at least 6 characters.");
+        return;
+      }
+
+      try {
+        const url = editingId ? `${apiBaseUrl}/${editingId}` : apiBaseUrl;
+        const method = editingId ? "PUT" : "POST";
+
+        // Don't send password if it's empty (for editing)
+        if (editingId && !formData.password) {
+          delete formData.password;
         }
-      } else {
-        users.push({
-          id: Date.now(),
-          ...formData,
-        });
-      }
 
-      renderUsers();
-      closeModal();
-      alert(editingId ? "User updated successfully!" : "User added successfully!");
+        const response = await fetch(url, {
+          method: method,
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRF-TOKEN": getCsrfToken(),
+          },
+          body: JSON.stringify(formData),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || "Failed to save user");
+        }
+
+        if (window.showSuccess) {
+          window.showSuccess(result.message || "User saved successfully");
+        }
+
+        if (userModal) userModal.classList.remove("show");
+        if (userForm) userForm.reset();
+        editingId = null;
+
+        await fetchUsers();
+      } catch (error) {
+        console.error("Error saving user:", error);
+        if (window.showError) {
+          window.showError(error.message || "Failed to save user. Please try again.");
+        }
+      }
     });
   }
 
-  renderUsers();
-}
+  // Search functionality
+  if (searchInput) {
+    let searchTimeout;
+    searchInput.addEventListener("input", (event) => {
+      searchQuery = event.target.value.trim();
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        fetchUsers();
+      }, 300);
+    });
+  }
 
+  // Initial load
+  fetchUsers();
+}

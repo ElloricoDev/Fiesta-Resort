@@ -83,6 +83,16 @@
 
     <div class="form-row">
       <x-admin.form-group 
+        label="Phone Number"
+        id="guestPhone"
+        type="tel"
+        placeholder="(555) 123-4567"
+        :required="false"
+      />
+    </div>
+
+    <div class="form-row">
+      <x-admin.form-group 
         label="Check-in Date"
         id="checkIn"
         type="date"
@@ -110,6 +120,16 @@
         :required="true"
       />
       <x-admin.form-select 
+        label="Room Number"
+        id="roomNumber"
+        :options="[]"
+        placeholder="Select room type and dates first"
+        :required="false"
+      />
+    </div>
+    
+    <div class="form-row">
+      <x-admin.form-select 
         label="Status"
         id="status"
         :options="[
@@ -123,5 +143,15 @@
       />
     </div>
   </x-admin.modal>
+
+  <!-- Delete Confirmation Modal -->
+  <x-admin.confirmation-modal 
+    id="deleteReservationModal"
+    title="Delete Reservation"
+    message="Are you sure you want to delete this reservation? This action cannot be undone."
+    confirm-text="Delete"
+    cancel-text="Cancel"
+    confirm-button-class="logout-modal-btn-delete"
+  />
 @endsection
 

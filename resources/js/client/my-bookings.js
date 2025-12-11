@@ -18,9 +18,22 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 function checkAuthentication() {
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+  const isLoggedIn = window.laravelAuth?.isAuthenticated || localStorage.getItem("isLoggedIn") === "true";
+  const userRole = window.laravelAuth?.user?.role || localStorage.getItem("userRole");
+
+  // Prevent admins from accessing client pages
+  if (isLoggedIn && userRole === 'admin') {
+    if (window.showError) window.showError("Admins cannot access client pages. Redirecting to admin dashboard...");
+    setTimeout(() => {
+      window.location.href = "/admin/dashboard";
+    }, 1000);
+    return;
+  }
+
   if (!isLoggedIn) {
-    alert("Please login to view your bookings");
+    if (window.showError) {
+      window.showError("Please login to view your bookings");
+    }
     // Navigation handled by HTML - redirect via meta or link
     const loginLink = document.createElement("a");
     loginLink.href = "/login";
@@ -378,36 +391,69 @@ function closeModal() {
 }
 
 function modifyBooking(bookingId) {
-  alert(
-    "Modify booking functionality will be implemented soon.\nBooking ID: " +
-      bookingId
-  );
+  if (window.showInfo) {
+    window.showInfo(`Modify booking functionality will be implemented soon. Booking ID: ${bookingId}`);
+  }
+}
+
+let pendingCancelBookingId = null;
+const cancelBookingModal = document.getElementById("cancelBookingModal");
+const cancelBookingModalConfirmBtn = document.getElementById("cancelBookingModalConfirmBtn");
+const cancelBookingModalCancelBtn = document.getElementById("cancelBookingModalCancelBtn");
+
+function showCancelBookingModal(bookingId) {
+  pendingCancelBookingId = bookingId;
+  if (cancelBookingModal) {
+    cancelBookingModal.classList.add("show");
+  }
+}
+
+function hideCancelBookingModal() {
+  if (cancelBookingModal) {
+    cancelBookingModal.classList.remove("show");
+  }
+  pendingCancelBookingId = null;
+}
+
+if (cancelBookingModalConfirmBtn) {
+  cancelBookingModalConfirmBtn.addEventListener("click", () => {
+    if (pendingCancelBookingId) {
+      let bookings = JSON.parse(localStorage.getItem("userBookings")) || [];
+      const bookingIndex = bookings.findIndex((b) => b.id === pendingCancelBookingId);
+
+      if (bookingIndex !== -1) {
+        bookings[bookingIndex].status = "Cancelled";
+        localStorage.setItem("userBookings", JSON.stringify(bookings));
+
+        closeModal();
+        hideCancelBookingModal();
+
+        const activeFilter = document.querySelector(".filter-btn.active");
+        const currentFilter = activeFilter
+          ? activeFilter.getAttribute("data-filter")
+          : "all";
+        loadBookings(currentFilter);
+
+        if (window.showSuccess) window.showSuccess("Booking cancelled successfully");
+      }
+    }
+  });
+}
+
+if (cancelBookingModalCancelBtn) {
+  cancelBookingModalCancelBtn.addEventListener("click", hideCancelBookingModal);
+}
+
+if (cancelBookingModal) {
+  cancelBookingModal.addEventListener("click", (event) => {
+    if (event.target === cancelBookingModal) {
+      hideCancelBookingModal();
+    }
+  });
 }
 
 function cancelBooking(bookingId) {
-  const confirmed = confirm(
-    "Are you sure you want to cancel this booking? This action cannot be undone."
-  );
-
-  if (confirmed) {
-    let bookings = JSON.parse(localStorage.getItem("userBookings")) || [];
-    const bookingIndex = bookings.findIndex((b) => b.id === bookingId);
-
-    if (bookingIndex !== -1) {
-      bookings[bookingIndex].status = "Cancelled";
-      localStorage.setItem("userBookings", JSON.stringify(bookings));
-
-      closeModal();
-
-      const activeFilter = document.querySelector(".filter-btn.active");
-      const currentFilter = activeFilter
-        ? activeFilter.getAttribute("data-filter")
-        : "all";
-      loadBookings(currentFilter);
-
-      alert("Booking cancelled successfully");
-    }
-  }
+  showCancelBookingModal(bookingId);
 }
 
 function generateSampleBookings(userEmail) {

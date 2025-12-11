@@ -9,10 +9,20 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 function checkAuthentication() {
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+  const isLoggedIn = window.laravelAuth?.isAuthenticated || localStorage.getItem("isLoggedIn") === "true";
+  const userRole = window.laravelAuth?.user?.role || localStorage.getItem("userRole");
+
+  // Prevent admins from accessing client pages
+  if (isLoggedIn && userRole === 'admin') {
+    if (window.showError) window.showError("Admins cannot access client pages. Redirecting to admin dashboard...");
+    setTimeout(() => {
+      window.location.href = "/admin/dashboard";
+    }, 1000);
+    return;
+  }
 
   if (!isLoggedIn) {
-    alert("Please login to continue with booking");
+    if (window.showError) window.showError("Please login to continue with booking");
     sessionStorage.setItem("redirectAfterLogin", window.location.href);
     // Navigation handled by HTML - redirect via meta or let user navigate
     const loginLink = document.createElement("a");
@@ -25,7 +35,7 @@ function loadBookingData() {
   const bookingData = JSON.parse(sessionStorage.getItem("pendingBooking"));
 
   if (!bookingData) {
-    alert("No booking information found. Please go to home page.");
+    if (window.showError) window.showError("No booking information found. Please go to home page.");
     // Navigation handled by HTML links
     return;
   }
@@ -121,13 +131,45 @@ function setupEventListeners() {
     });
 
   const cancelBtn = document.getElementById("cancelBooking");
+  const cancelBookingModal = document.getElementById("cancelBookingModal");
+  const cancelBookingModalConfirmBtn = document.getElementById("cancelBookingModalConfirmBtn");
+  const cancelBookingModalCancelBtn = document.getElementById("cancelBookingModalCancelBtn");
+
+  function showCancelBookingModal() {
+    if (cancelBookingModal) {
+      cancelBookingModal.classList.add("show");
+    }
+  }
+
+  function hideCancelBookingModal() {
+    if (cancelBookingModal) {
+      cancelBookingModal.classList.remove("show");
+    }
+  }
+
+  if (cancelBookingModalConfirmBtn) {
+    cancelBookingModalConfirmBtn.addEventListener("click", () => {
+      sessionStorage.removeItem("pendingBooking");
+      hideCancelBookingModal();
+      window.location.reload();
+    });
+  }
+
+  if (cancelBookingModalCancelBtn) {
+    cancelBookingModalCancelBtn.addEventListener("click", hideCancelBookingModal);
+  }
+
+  if (cancelBookingModal) {
+    cancelBookingModal.addEventListener("click", (event) => {
+      if (event.target === cancelBookingModal) {
+        hideCancelBookingModal();
+      }
+    });
+  }
+
   if (cancelBtn) {
     cancelBtn.addEventListener("click", () => {
-      if (confirm("Are you sure you want to cancel this booking?")) {
-        sessionStorage.removeItem("pendingBooking");
-        // Navigation handled by HTML - convert button to link or reload
-        window.location.reload();
-      }
+      showCancelBookingModal();
     });
   }
 
@@ -210,22 +252,22 @@ function validatePaymentForm() {
   const validationDate = document.getElementById("validationDate").value;
 
   if (!gcashNumber) {
-    alert("Please enter your GCASH number");
+    if (window.showError) window.showError("Please enter your GCASH number");
     return false;
   }
 
   if (!bankName) {
-    alert("Please select a bank");
+    if (window.showError) window.showError("Please select a bank");
     return false;
   }
 
   if (!validationDate) {
-    alert("Please select a validation date");
+    if (window.showError) window.showError("Please select a validation date");
     return false;
   }
 
   if (gcashNumber.length < 11) {
-    alert("Please enter a valid GCASH number (11 digits)");
+    if (window.showError) window.showError("Please enter a valid GCASH number (11 digits)");
     return false;
   }
 

@@ -1,13 +1,18 @@
 const body = document.body;
 
-// Check if user is admin on page load
+// Check if user is admin on page load (fallback check - server-side middleware is primary)
 document.addEventListener("DOMContentLoaded", function () {
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-  const userRole = localStorage.getItem("userRole");
+  // Check Laravel auth first, then fall back to localStorage (for dummy users)
+  const isLoggedIn = window.laravelAuth?.isAuthenticated || localStorage.getItem("isLoggedIn") === "true";
+  const userRole = window.laravelAuth?.user?.role || localStorage.getItem("userRole");
   
   if (!isLoggedIn || userRole !== "admin") {
-    alert("Access denied. Admin privileges required.");
-    window.location.href = "/";
+    if (window.showError) {
+      window.showError("Access denied. Admin privileges required.");
+    }
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 1000);
     return;
   }
 });
@@ -82,6 +87,24 @@ function hideLogoutModal() {
 
 // Function to perform logout
 function performLogout() {
+  // If using Laravel auth, submit logout form
+  if (window.laravelAuth?.isAuthenticated) {
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = window.laravelAuth.logoutUrl || "/logout";
+    
+    const csrfToken = document.createElement("input");
+    csrfToken.type = "hidden";
+    csrfToken.name = "_token";
+    csrfToken.value = window.laravelAuth.csrfToken || "";
+    form.appendChild(csrfToken);
+    
+    document.body.appendChild(form);
+    form.submit();
+    return;
+  }
+  
+  // Otherwise, clear localStorage (for dummy users)
   // Clear localStorage (dummy data authentication)
   localStorage.removeItem("isLoggedIn");
   localStorage.removeItem("userEmail");
@@ -150,9 +173,13 @@ dropdownItems.forEach((item) => {
     const text = item.textContent.trim();
 
     if (text === "View all notifications") {
-      alert("Notifications page will be implemented soon.");
+      if (window.showInfo) {
+        window.showInfo("Notifications page will be implemented soon.");
+      }
     } else if (text === "Account Preferences") {
-      alert("Account preferences page will be implemented soon.");
+      if (window.showInfo) {
+        window.showInfo("Account preferences page will be implemented soon.");
+      }
     } else {
       console.log("Clicked:", text);
     }

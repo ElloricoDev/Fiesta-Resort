@@ -18,6 +18,7 @@ export default defineConfig({
                 'resources/css/admin/users.css',
                 'resources/js/admin/base.js',
                 'resources/js/admin/dashboard.js',
+                'resources/js/admin/notifications.js',
                 'resources/js/admin/guests.js',
                 'resources/js/admin/reservations.js',
                 'resources/js/admin/rooms.js',
@@ -46,6 +47,8 @@ export default defineConfig({
                 'resources/js/client/room-details.js',
                 // Dummy data seed script
                 'resources/js/dummy-data.js',
+                // Notification utility
+                'resources/js/utils/notifications.js',
             ],
             refresh: true,
         }),

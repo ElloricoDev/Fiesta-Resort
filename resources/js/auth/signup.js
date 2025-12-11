@@ -135,7 +135,8 @@ if (signupForm) {
       return;
     }
 
-    // Create dummy user account in localStorage (for testing)
+    // Check if this is a dummy user registration (for testing)
+    // Only handle dummy users if they're in the dummy users list
     const existingUsers = JSON.parse(localStorage.getItem("dummyUsers") || "[]");
     const userExists = existingUsers.some((u) => u.email === email);
     
@@ -145,39 +146,9 @@ if (signupForm) {
       return;
     }
 
-    // Add new user to dummy users
-    const newUser = {
-      email: email,
-      password: password,
-      name: name,
-      role: "user",
-    };
-    existingUsers.push(newUser);
-    localStorage.setItem("dummyUsers", JSON.stringify(existingUsers));
-
-    // Auto-login the new user
-    localStorage.setItem("isLoggedIn", "true");
-    localStorage.setItem("userEmail", email);
-    localStorage.setItem("userName", name);
-    localStorage.setItem("userRole", "user");
-    localStorage.setItem("lastLogin", new Date().toISOString());
-
-    // Create user profile
-    const userProfile = {
-      firstName: name.split(" ")[0] || name,
-      lastName: name.split(" ").slice(1).join(" ") || "",
-      email: email,
-      phone: "",
-      dateOfBirth: "",
-      address: "",
-      city: "",
-      country: "",
-    };
-    localStorage.setItem("userProfile", JSON.stringify(userProfile));
-
-    // Prevent form submission for dummy users and redirect to home
-    event.preventDefault();
-    window.location.href = "/";
+    // For new registrations, let Laravel handle it
+    // The form will submit normally and Laravel will create the user
+    // Laravel will automatically log them in and redirect
   });
 
   // Navigation handled by HTML links - no JS routing needed
@@ -189,9 +160,9 @@ if (signupForm) {
       const href = termsLink.getAttribute("href");
       if (!href || href === "#") {
         event.preventDefault();
-        alert(
-          "Terms & Policy page will be implemented soon.\n\nThis would typically show the terms of service and privacy policy."
-        );
+        if (window.showInfo) {
+          window.showInfo("Terms & Policy page will be implemented soon. This would typically show the terms of service and privacy policy.");
+        }
       }
     });
   }

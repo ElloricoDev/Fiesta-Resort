@@ -149,6 +149,120 @@ body.fade-out {
   font-size: 14px;
 }
 
+.dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.notification-badge {
+  background-color: #ef4444;
+  color: white;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
+}
+
+.notifications-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  padding: 12px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.notification-item:hover {
+  background-color: #f9fafb;
+}
+
+.notification-item.unread {
+  background-color: #eff6ff;
+  border-left: 3px solid #3b82f6;
+}
+
+.notification-item.unread:hover {
+  background-color: #dbeafe;
+}
+
+.notification-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notification-title {
+  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 14px;
+}
+
+.notification-message {
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.notification-time {
+  color: #9ca3af;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.notification-item-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.notification-item:hover .notification-item-actions {
+  opacity: 1;
+}
+
+.notification-action-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.notification-action-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.notification-action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.notification-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.notification-actions {
+  padding: 8px 0;
+}
+
 .dropdown-item:hover {
   background-color: #f3f4f6;
 }

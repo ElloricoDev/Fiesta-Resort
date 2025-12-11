@@ -2,7 +2,18 @@
 
 document.addEventListener("DOMContentLoaded", function () {
   // Check if user is logged in
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+  const isLoggedIn = window.laravelAuth?.isAuthenticated || localStorage.getItem("isLoggedIn") === "true";
+  const userRole = window.laravelAuth?.user?.role || localStorage.getItem("userRole");
+
+  // Prevent admins from accessing client pages
+  if (isLoggedIn && userRole === 'admin') {
+    if (window.showError) window.showError("Admins cannot access client pages. Redirecting to admin dashboard...");
+    setTimeout(() => {
+      window.location.href = "/admin/dashboard";
+    }, 1000);
+    return;
+  }
+
   if (!isLoggedIn) {
     // Navigation handled by HTML - redirect via meta or link
     const loginLink = document.createElement("a");
@@ -144,18 +155,18 @@ function savePersonalInfo() {
   const country = document.getElementById("country")?.value.trim() || "";
 
   if (!firstName || !lastName) {
-    alert("First name and last name are required.");
+    if (window.showError) window.showError("First name and last name are required.");
     return;
   }
 
   if (!email) {
-    alert("Email address is required.");
+    if (window.showError) window.showError("Email address is required.");
     return;
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    alert("Please enter a valid email address.");
+    if (window.showError) window.showError("Please enter a valid email address.");
     return;
   }
 
@@ -178,7 +189,7 @@ function savePersonalInfo() {
     profileNameEl.textContent = `${firstName} ${lastName}`.trim();
   }
 
-  alert("Profile updated successfully!");
+  if (window.showSuccess) window.showSuccess("Profile updated successfully!");
   switchTab("overview");
 }
 
@@ -189,22 +200,22 @@ function changePassword() {
   const confirmPassword = document.getElementById("confirmPassword")?.value || "";
 
   if (!currentPassword || !newPassword || !confirmPassword) {
-    alert("Please fill in all password fields.");
+    if (window.showError) window.showError("Please fill in all password fields.");
     return;
   }
 
   if (newPassword.length < 6) {
-    alert("New password must be at least 6 characters.");
+    if (window.showError) window.showError("New password must be at least 6 characters.");
     return;
   }
 
   if (newPassword !== confirmPassword) {
-    alert("New password and confirm password do not match.");
+    if (window.showError) window.showError("New password and confirm password do not match.");
     return;
   }
 
   // In a real app, this would make an API call
-  alert("Password changed successfully!");
+  if (window.showSuccess) window.showSuccess("Password changed successfully!");
   
   // Clear password fields
   document.getElementById("currentPassword").value = "";
@@ -311,7 +322,7 @@ window.savePreferences = function () {
   };
 
   localStorage.setItem("userPreferences", JSON.stringify(preferences));
-  alert("Preferences saved successfully!");
+  if (window.showSuccess) window.showSuccess("Preferences saved successfully!");
 };
 
 // Update last login time

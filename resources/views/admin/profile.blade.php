@@ -16,32 +16,32 @@
   <div class="profile-container" id="profileContainer">
     <div class="profile-section">
       <label class="section-label" for="fullName">Full Name</label>
-      <input type="text" class="profile-input" id="fullName" value="Admin Sample Name" disabled />
+      <input type="text" class="profile-input" id="fullName" value="{{ $user['name'] }}" disabled />
     </div>
 
     <div class="profile-row">
       <div class="profile-section">
         <label class="section-label" for="email">Email Address</label>
-        <input type="email" class="profile-input" id="email" value="admin@gmail.com" disabled />
+        <input type="email" class="profile-input" id="email" value="{{ $user['email'] }}" disabled />
       </div>
       <div class="profile-section">
         <label class="section-label" for="phoneNumber">Phone Number</label>
         <div class="phone-input-group">
           <select class="country-code-select" id="countryCode" disabled>
-            <option value="+63">+63 (PH)</option>
-            <option value="+1">+1 (US)</option>
-            <option value="+44">+44 (UK)</option>
-            <option value="+81">+81 (JP)</option>
-            <option value="+86">+86 (CN)</option>
+            <option value="+63" {{ $user['country_code'] === '+63' ? 'selected' : '' }}>+63 (PH)</option>
+            <option value="+1" {{ $user['country_code'] === '+1' ? 'selected' : '' }}>+1 (US)</option>
+            <option value="+44" {{ $user['country_code'] === '+44' ? 'selected' : '' }}>+44 (UK)</option>
+            <option value="+81" {{ $user['country_code'] === '+81' ? 'selected' : '' }}>+81 (JP)</option>
+            <option value="+86" {{ $user['country_code'] === '+86' ? 'selected' : '' }}>+86 (CN)</option>
           </select>
-          <input type="tel" class="profile-input phone-number-input" id="phoneNumber" value="9123438903" disabled />
+          <input type="tel" class="profile-input phone-number-input" id="phoneNumber" value="{{ $user['phone'] }}" disabled />
         </div>
       </div>
     </div>
 
     <div class="profile-section">
       <label class="section-label" for="address">Address</label>
-      <textarea class="profile-textarea" id="address" disabled>Sitio Dacuman, Barangay Ipil, Surigao City, 8400, PH</textarea>
+      <textarea class="profile-textarea" id="address" disabled>{{ $user['address'] }}</textarea>
     </div>
 
     <div class="password-section">
@@ -71,5 +71,15 @@
       <button class="profile-btn edit-btn" id="editBtn" type="button">Edit Profile</button>
     </div>
   </div>
+
+  <!-- Cancel Confirmation Modal -->
+  <x-admin.confirmation-modal 
+    id="cancelProfileModal"
+    title="Cancel Changes"
+    message="Are you sure you want to cancel? Any unsaved changes will be lost."
+    confirm-text="Yes, Cancel"
+    cancel-text="Keep Editing"
+    confirm-button-class="logout-modal-btn-confirm"
+  />
 @endsection
 

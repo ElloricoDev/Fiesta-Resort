@@ -155,7 +155,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (!isLoggedIn) {
         e.preventDefault();
-        alert("Please login to book this room");
+        if (window.showError) window.showError("Please login to book this room");
         // Store the current page URL to redirect back after login
         sessionStorage.setItem("redirectAfterLogin", window.location.href);
         // Change href to login page

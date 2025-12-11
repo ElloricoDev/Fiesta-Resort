@@ -28,10 +28,10 @@
     <table class="rooms-table">
       <thead>
         <tr>
-          <th>Room Type</th>
+          <th>Room Number</th>
           <th>Capacity</th>
           <th>Status</th>
-          <th>Base Price</th>
+          <th>Price/Night</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -53,12 +53,22 @@
   >
     <x-admin.form-row>
       <x-admin.form-group 
+        label="Room Number"
+        id="roomNumber"
+        type="text"
+        placeholder="e.g., 101, 201, DKS-01"
+        :required="true"
+      />
+      <x-admin.form-group 
         label="Room Type"
         id="roomType"
         type="text"
         placeholder="e.g., Deluxe King Suite"
         :required="true"
       />
+    </x-admin.form-row>
+    
+    <x-admin.form-row>
       <x-admin.form-group 
         label="Capacity"
         id="capacity"
@@ -68,30 +78,41 @@
         :min="1"
         :max="10"
       />
+      <x-admin.form-group 
+        label="Price per Night ($)"
+        id="basePrice"
+        type="number"
+        placeholder="0.00"
+        :required="true"
+        :min="0"
+        :step="0.01"
+      />
     </x-admin.form-row>
 
     <x-admin.form-row>
-      <x-admin.form-group 
-        label="Base Price (₱)"
-        id="basePrice"
-        type="number"
-        placeholder="0"
-        :required="true"
-        :min="0"
-        :step="10"
-      />
       <x-admin.form-select 
         label="Status"
         id="status"
         :options="[
           'available' => 'Available',
           'occupied' => 'Occupied',
-          'under-maintenance' => 'Under Maintenance'
+          'maintenance' => 'Under Maintenance',
+          'reserved' => 'Reserved'
         ]"
         selected="available"
         :required="true"
       />
     </x-admin.form-row>
   </x-admin.modal>
+
+  <!-- Delete Confirmation Modal -->
+  <x-admin.confirmation-modal 
+    id="deleteRoomModal"
+    title="Delete Room"
+    message="Are you sure you want to delete this room? This action cannot be undone."
+    confirm-text="Delete"
+    cancel-text="Cancel"
+    confirm-button-class="logout-modal-btn-delete"
+  />
 @endsection
 

@@ -11,60 +11,105 @@ if (settingsContainer) {
   const cancelBtn = document.getElementById("cancelBtn");
   const saveBtn = document.getElementById("saveBtn");
 
-  const defaultSettings = {
-    hotelName: "Fiesta Resort",
-    address: "Sitio Dacuman, Barangay Ipil, Surigao City, 8400, PH",
-    zipCode: "8400",
-    timezone: "pst",
-    language: "english",
-    dateFormat: "yyyy-mm-dd",
-  };
+  // API base URL
+  const apiBaseUrl = "/admin/api/settings";
+
+  // Get CSRF token from meta tag
+  function getCsrfToken() {
+    const metaTag = document.querySelector('meta[name="csrf-token"]');
+    return metaTag ? metaTag.getAttribute("content") : "";
+  }
 
   let originalSettings = {};
 
-  function loadSettings() {
-    const savedSettings = localStorage.getItem("hotelSettings");
-    const settings = savedSettings
-      ? JSON.parse(savedSettings)
-      : defaultSettings;
+  // Load settings from API
+  async function loadSettings() {
+    try {
+      const response = await fetch(apiBaseUrl, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
 
-    hotelNameInput.value = settings.hotelName;
-    addressInput.value = settings.address;
-    zipCodeInput.value = settings.zipCode;
-    timezoneSelect.value = settings.timezone;
-    languageSelect.value = settings.language;
-    dateFormatSelect.value = settings.dateFormat;
-    originalSettings = { ...settings };
+      if (!response.ok) {
+        throw new Error("Failed to fetch settings");
+      }
+
+      const result = await response.json();
+      const settings = result.data;
+
+      hotelNameInput.value = settings.hotel_name || "";
+      addressInput.value = settings.address || "";
+      zipCodeInput.value = settings.zip_code || "";
+      timezoneSelect.value = settings.timezone || "pst";
+      languageSelect.value = settings.language || "english";
+      dateFormatSelect.value = settings.date_format || "yyyy-mm-dd";
+
+      originalSettings = { ...settings };
+    } catch (error) {
+      console.error("Error loading settings:", error);
+      if (window.showError) {
+        window.showError("Failed to load settings. Please refresh the page.");
+      }
+    }
   }
 
-  function saveSettings() {
+  // Save settings via API
+  async function saveSettings() {
     const settings = {
-      hotelName: hotelNameInput.value.trim(),
+      hotel_name: hotelNameInput.value.trim(),
       address: addressInput.value.trim(),
-      zipCode: zipCodeInput.value.trim(),
+      zip_code: zipCodeInput.value.trim(),
       timezone: timezoneSelect.value,
       language: languageSelect.value,
-      dateFormat: dateFormatSelect.value,
+      date_format: dateFormatSelect.value,
     };
 
-    if (!settings.hotelName) {
-      alert("Hotel name is required.");
+    if (!settings.hotel_name) {
+      if (window.showError) window.showError("Hotel name is required.");
       return false;
     }
 
     if (!settings.address) {
-      alert("Address is required.");
+      if (window.showError) window.showError("Address is required.");
       return false;
     }
 
-    if (!settings.zipCode) {
-      alert("ZIP code is required.");
+    if (!settings.zip_code) {
+      if (window.showError) window.showError("ZIP code is required.");
       return false;
     }
 
-    localStorage.setItem("hotelSettings", JSON.stringify(settings));
-    originalSettings = { ...settings };
-    return true;
+    try {
+      const response = await fetch(apiBaseUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRF-TOKEN": getCsrfToken(),
+        },
+        body: JSON.stringify(settings),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to save settings");
+      }
+
+      originalSettings = { ...settings };
+      return true;
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      if (window.showError) {
+        window.showError(error.message || "Failed to save settings. Please try again.");
+      }
+      return false;
+    }
   }
 
   function enableEditMode() {
@@ -88,33 +133,63 @@ if (settingsContainer) {
   }
 
   function restoreSettings() {
-    hotelNameInput.value = originalSettings.hotelName;
-    addressInput.value = originalSettings.address;
-    zipCodeInput.value = originalSettings.zipCode;
-    timezoneSelect.value = originalSettings.timezone;
-    languageSelect.value = originalSettings.language;
-    dateFormatSelect.value = originalSettings.dateFormat;
+    hotelNameInput.value = originalSettings.hotel_name || "";
+    addressInput.value = originalSettings.address || "";
+    zipCodeInput.value = originalSettings.zip_code || "";
+    timezoneSelect.value = originalSettings.timezone || "pst";
+    languageSelect.value = originalSettings.language || "english";
+    dateFormatSelect.value = originalSettings.date_format || "yyyy-mm-dd";
   }
 
   editBtn.addEventListener("click", () => {
     enableEditMode();
   });
 
-  cancelBtn.addEventListener("click", () => {
-    if (
-      confirm(
-        "Are you sure you want to cancel? Any unsaved changes will be lost."
-      )
-    ) {
+  const cancelModal = document.getElementById("cancelSettingsModal");
+  const cancelModalConfirmBtn = document.getElementById("cancelSettingsModalConfirmBtn");
+  const cancelModalCancelBtn = document.getElementById("cancelSettingsModalCancelBtn");
+
+  function showCancelModal() {
+    if (cancelModal) {
+      cancelModal.classList.add("show");
+    }
+  }
+
+  function hideCancelModal() {
+    if (cancelModal) {
+      cancelModal.classList.remove("show");
+    }
+  }
+
+  if (cancelModalConfirmBtn) {
+    cancelModalConfirmBtn.addEventListener("click", () => {
       restoreSettings();
       disableEditMode();
-    }
+      hideCancelModal();
+    });
+  }
+
+  if (cancelModalCancelBtn) {
+    cancelModalCancelBtn.addEventListener("click", hideCancelModal);
+  }
+
+  if (cancelModal) {
+    cancelModal.addEventListener("click", (event) => {
+      if (event.target === cancelModal) {
+        hideCancelModal();
+      }
+    });
+  }
+
+  cancelBtn.addEventListener("click", () => {
+    showCancelModal();
   });
 
-  saveBtn.addEventListener("click", () => {
-    if (saveSettings()) {
+  saveBtn.addEventListener("click", async () => {
+    const saved = await saveSettings();
+    if (saved) {
       disableEditMode();
-      alert("Settings saved successfully!");
+      if (window.showSuccess) window.showSuccess("Settings saved successfully!");
     }
   });
 
@@ -125,6 +200,6 @@ if (settingsContainer) {
     }
   });
 
+  // Load settings on page load
   loadSettings();
 }
-

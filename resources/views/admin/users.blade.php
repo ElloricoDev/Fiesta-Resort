@@ -92,5 +92,15 @@
       </small>
     </x-admin.form-group>
   </x-admin.modal>
+
+  <!-- Delete Confirmation Modal -->
+  <x-admin.confirmation-modal 
+    id="deleteUserModal"
+    title="Delete User"
+    message="Are you sure you want to delete this user? This action cannot be undone."
+    confirm-text="Delete"
+    cancel-text="Cancel"
+    confirm-button-class="logout-modal-btn-delete"
+  />
 @endsection
 

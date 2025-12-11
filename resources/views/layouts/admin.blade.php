@@ -3,13 +3,31 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Fiesta Resort Admin')</title>
     @vite([
       'resources/css/admin/base.css',
       'resources/js/admin/base.js',
+      'resources/js/admin/notifications.js',
       'resources/js/dummy-data.js',
     ])
     @stack('styles')
+    @php
+      $userData = auth()->check() ? [
+        'email' => auth()->user()->email,
+        'name' => auth()->user()->name,
+        'role' => auth()->user()->role ?? 'user',
+      ] : null;
+    @endphp
+    <script>
+      // Pass Laravel authenticated user data to JavaScript
+      window.laravelAuth = {
+        isAuthenticated: {{ auth()->check() ? 'true' : 'false' }},
+        user: @json($userData),
+        logoutUrl: "{{ route('logout') }}",
+        csrfToken: "{{ csrf_token() }}",
+      };
+    </script>
   </head>
   <body>
     <header class="admin-header">
@@ -29,12 +47,20 @@
             </svg>
           </button>
           <div class="dropdown-menu" id="notificationMenu">
-            <div class="dropdown-header">Notifications</div>
-            <button class="dropdown-item" type="button">New reservation from Emily Carter</button>
-            <button class="dropdown-item" type="button">Room 101 has been cleaned</button>
-            <button class="dropdown-item" type="button">Guest check-in reminder</button>
+            <div class="dropdown-header">
+              <span>Notifications</span>
+              <span id="notificationBadge" class="notification-badge" style="display: none;">0</span>
+            </div>
+            <div id="notificationsList" class="notifications-list">
+              <div class="notification-loading" style="padding: 20px; text-align: center; color: #6b7280;">
+                Loading notifications...
+              </div>
+            </div>
             <div class="dropdown-divider"></div>
-            <button class="dropdown-item" type="button">View all notifications</button>
+            <div class="notification-actions">
+              <button class="dropdown-item" id="markAllReadBtn" type="button" style="display: none;">Mark all as read</button>
+              <button class="dropdown-item" id="viewAllNotificationsBtn" type="button">View all notifications</button>
+            </div>
           </div>
         </div>
 
@@ -138,7 +164,11 @@
       cancel-text="Cancel"
     />
 
+    <!-- Toast Notification Container -->
+    <x-admin.toast-notification id="adminToastContainer" />
+
     @stack('scripts')
+    @vite('resources/js/utils/notifications.js')
   </body>
 </html>
 

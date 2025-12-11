@@ -1,62 +1,123 @@
 const guestsTableBody = document.getElementById("guestsTableBody");
 
 if (guestsTableBody) {
-  // Load guests from localStorage or use default dummy data
-  let storedGuests = localStorage.getItem("adminGuestsData");
-  let guests = storedGuests
-    ? JSON.parse(storedGuests).map((g, index) => ({
-        id: index + 1,
-        guestId: g.id,
-        name: g.name,
-        email: g.email,
-        phone: g.phone,
-        totalStays: g.totalBookings || 0,
-        startSince: g.lastVisit
-          ? new Date(g.lastVisit).toISOString().split("T")[0]
-          : "2023-01-01",
-      }))
-    : [
-        {
-          id: 1,
-          guestId: "#1021",
-          name: "Olivia Martin",
-          email: "olivia.martin@gmail.com",
-          phone: "(555) 123-4567",
-          totalStays: 5,
-          startSince: "2022-03-10",
-        },
-        {
-          id: 2,
-          guestId: "#1022",
-          name: "Emily Carter",
-          email: "emily.carter@example.com",
-          phone: "(555) 987-6543",
-          totalStays: 7,
-          startSince: "2020-06-19",
-        },
-        {
-          id: 3,
-          guestId: "#1023",
-          name: "David Lee",
-          email: "david.lee@example.com",
-          phone: "(555) 456-7890",
-          totalStays: 2,
-          startSince: "2023-05-20",
-        },
-      ];
-
+  let guests = [];
   let searchQuery = "";
   let editingId = null;
-  let nextGuestIdNumber = 1024;
 
   const searchInput = document.getElementById("searchInput");
   const emptyState = document.getElementById("emptyState");
-  const addGuestBtn = document.getElementById("addGuestBtn");
   const guestModal = document.getElementById("guestModal");
   const modalTitle = document.getElementById("modalTitle");
   const closeModalBtn = document.getElementById("closeModalBtn");
   const cancelModalBtn = document.getElementById("cancelModalBtn");
   const guestForm = document.getElementById("guestForm");
+
+  // API base URL
+  const apiBaseUrl = "/admin/api/guests";
+
+  // Get CSRF token from meta tag
+  function getCsrfToken() {
+    const metaTag = document.querySelector('meta[name="csrf-token"]');
+    return metaTag ? metaTag.getAttribute("content") : "";
+  }
+
+  // API helper functions
+  async function fetchGuests() {
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) {
+        params.append("search", searchQuery);
+      }
+
+      const response = await fetch(`${apiBaseUrl}?${params.toString()}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch guests");
+      }
+
+      const result = await response.json();
+      return result.data || [];
+    } catch (error) {
+      console.error("Error fetching guests:", error);
+      showError("Failed to load guests. Please try again.");
+      return [];
+    }
+  }
+
+  async function updateGuest(id, data) {
+    try {
+      const response = await fetch(`${apiBaseUrl}/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRF-TOKEN": getCsrfToken(),
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to update guest");
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error("Error updating guest:", error);
+      throw error;
+    }
+  }
+
+  async function deleteGuestApi(id) {
+    try {
+      const response = await fetch(`${apiBaseUrl}/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRF-TOKEN": getCsrfToken(),
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to delete guest");
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error deleting guest:", error);
+      throw error;
+    }
+  }
+
+  function showError(message) {
+    if (window.showError) {
+      window.showError(message);
+    } else {
+      console.error(message);
+    }
+  }
+
+  function showSuccess(message) {
+    if (window.showSuccess) {
+      window.showSuccess(message);
+    } else {
+      console.log(message);
+    }
+  }
 
   function getInitials(name) {
     return name
@@ -67,23 +128,8 @@ if (guestsTableBody) {
       .slice(0, 2);
   }
 
-  function getFilteredGuests() {
-    return guests.filter((guest) => {
-      const query = searchQuery.toLowerCase();
-      return (
-        query === "" ||
-        guest.name.toLowerCase().includes(query) ||
-        guest.email.toLowerCase().includes(query) ||
-        guest.phone.toLowerCase().includes(query) ||
-        guest.guestId.toLowerCase().includes(query)
-      );
-    });
-  }
-
   function renderGuests() {
-    const filteredGuests = getFilteredGuests();
-
-    if (filteredGuests.length === 0) {
+    if (guests.length === 0) {
       guestsTableBody.innerHTML = "";
       if (emptyState) {
         emptyState.style.display = "block";
@@ -95,7 +141,7 @@ if (guestsTableBody) {
       emptyState.style.display = "none";
     }
 
-    guestsTableBody.innerHTML = filteredGuests
+    guestsTableBody.innerHTML = guests
       .map(
         (guest) => `
       <tr>
@@ -104,18 +150,18 @@ if (guestsTableBody) {
             <div class="guest-avatar">${getInitials(guest.name)}</div>
             <div class="guest-info">
               <div class="guest-name">${guest.name}</div>
-              <div class="guest-id">Guest ID: ${guest.guestId}</div>
+              <div class="guest-id">${guest.email}</div>
             </div>
           </div>
         </td>
         <td>
           <div class="contact-cell">
             <div class="contact-line">${guest.email}</div>
-            <div class="contact-line">${guest.phone}</div>
+            <div class="contact-line">${guest.phone || "N/A"}</div>
           </div>
         </td>
-        <td>${guest.totalStays}</td>
-        <td>${guest.startSince}</td>
+        <td>${guest.total_stays || 0}</td>
+        <td>${guest.start_since || "N/A"}</td>
         <td>
           <div class="actions-cell">
             <button class="action-btn edit-btn" data-action="edit" data-id="${guest.id}">
@@ -132,13 +178,18 @@ if (guestsTableBody) {
       .join("");
   }
 
+  async function loadGuests() {
+    guests = await fetchGuests();
+    renderGuests();
+  }
+
   function closeModal() {
-    guestModal.classList.remove("show");
-    guestForm.reset();
+    if (guestModal) guestModal.classList.remove("show");
+    if (guestForm) guestForm.reset();
     editingId = null;
   }
 
-  guestsTableBody.addEventListener("click", (event) => {
+  guestsTableBody.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
 
@@ -148,50 +199,91 @@ if (guestsTableBody) {
     if (!action || !id) return;
 
     if (action === "edit") {
-      editGuest(Number(id));
+      await editGuest(Number(id));
     } else if (action === "delete") {
-      deleteGuest(Number(id));
+      await deleteGuestHandler(Number(id));
     }
   });
 
-  function editGuest(id) {
+  async function editGuest(id) {
     const guest = guests.find((g) => g.id === id);
     if (!guest) return;
 
     editingId = id;
-    modalTitle.textContent = "Edit Guest";
-    document.getElementById("guestName").value = guest.name;
-    document.getElementById("guestEmail").value = guest.email;
-    document.getElementById("guestPhone").value = guest.phone;
-    document.getElementById("startSince").value = guest.startSince;
-    document.getElementById("totalStays").value = guest.totalStays;
-    guestModal.classList.add("show");
+    if (modalTitle) modalTitle.textContent = "Edit Guest";
+    document.getElementById("guestName").value = guest.name || "";
+    document.getElementById("guestEmail").value = guest.email || "";
+    document.getElementById("guestPhone").value = guest.phone || "";
+    document.getElementById("startSince").value = guest.start_since || "";
+    // Note: total_stays is read-only, calculated from reservations
+    if (guestModal) guestModal.classList.add("show");
   }
 
-  function deleteGuest(id) {
+  let pendingDeleteId = null;
+  const deleteModal = document.getElementById("deleteGuestModal");
+  const deleteModalConfirmBtn = document.getElementById("deleteGuestModalConfirmBtn");
+  const deleteModalCancelBtn = document.getElementById("deleteGuestModalCancelBtn");
+
+  function showDeleteModal(id) {
     const guest = guests.find((g) => g.id === id);
     if (!guest) return;
 
-    if (confirm(`Are you sure you want to delete ${guest.name}?`)) {
-      guests = guests.filter((g) => g.id !== id);
-      renderGuests();
-      alert("Guest deleted successfully!");
+    pendingDeleteId = id;
+    if (deleteModal) {
+      const messageEl = deleteModal.querySelector('.logout-modal-body p');
+      if (messageEl) {
+        messageEl.textContent = `Are you sure you want to delete ${guest.name}? This action cannot be undone.`;
+      }
+      deleteModal.classList.add("show");
     }
   }
 
-  if (searchInput) {
-    searchInput.addEventListener("input", (event) => {
-      searchQuery = event.target.value;
-      renderGuests();
+  function hideDeleteModal() {
+    if (deleteModal) {
+      deleteModal.classList.remove("show");
+    }
+    pendingDeleteId = null;
+  }
+
+  if (deleteModalConfirmBtn) {
+    deleteModalConfirmBtn.addEventListener("click", async () => {
+      if (pendingDeleteId) {
+        try {
+          await deleteGuestApi(pendingDeleteId);
+          await loadGuests();
+          hideDeleteModal();
+          showSuccess("Guest deleted successfully!");
+        } catch (error) {
+          showError(error.message || "Failed to delete guest");
+        }
+      }
     });
   }
 
-  if (addGuestBtn) {
-    addGuestBtn.addEventListener("click", () => {
-      editingId = null;
-      modalTitle.textContent = "Add Guest";
-      guestForm.reset();
-      guestModal.classList.add("show");
+  if (deleteModalCancelBtn) {
+    deleteModalCancelBtn.addEventListener("click", hideDeleteModal);
+  }
+
+  if (deleteModal) {
+    deleteModal.addEventListener("click", (event) => {
+      if (event.target === deleteModal) {
+        hideDeleteModal();
+      }
+    });
+  }
+
+  async function deleteGuestHandler(id) {
+    showDeleteModal(id);
+  }
+
+  if (searchInput) {
+    let searchTimeout;
+    searchInput.addEventListener("input", (event) => {
+      clearTimeout(searchTimeout);
+      searchQuery = event.target.value.trim();
+      searchTimeout = setTimeout(async () => {
+        await loadGuests();
+      }, 300); // Debounce search
     });
   }
 
@@ -203,58 +295,42 @@ if (guestsTableBody) {
     cancelModalBtn.addEventListener("click", closeModal);
   }
 
-  guestModal.addEventListener("click", (event) => {
-    if (event.target === guestModal) {
-      closeModal();
-    }
-  });
+  if (guestModal) {
+    guestModal.addEventListener("click", (event) => {
+      if (event.target === guestModal) {
+        closeModal();
+      }
+    });
+  }
 
   if (guestForm) {
-    guestForm.addEventListener("submit", (event) => {
+    guestForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
       const formData = {
         name: document.getElementById("guestName").value.trim(),
         email: document.getElementById("guestEmail").value.trim(),
-        phone: document.getElementById("guestPhone").value.trim(),
-        startSince: document.getElementById("startSince").value,
-        totalStays: parseInt(document.getElementById("totalStays").value, 10),
+        phone: document.getElementById("guestPhone").value.trim() || null,
+        start_since: document.getElementById("startSince").value || null,
       };
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
-        alert("Please enter a valid email address.");
+        showError("Please enter a valid email address.");
         return;
       }
 
-      if (formData.totalStays < 0) {
-        alert("Total stays cannot be negative.");
-        return;
+      try {
+        await updateGuest(editingId, formData);
+        closeModal();
+        await loadGuests();
+        showSuccess("Guest updated successfully!");
+      } catch (error) {
+        showError(error.message || "Failed to update guest. Please try again.");
       }
-
-      if (editingId) {
-        const index = guests.findIndex((g) => g.id === editingId);
-        if (index !== -1) {
-          guests[index] = {
-            ...guests[index],
-            ...formData,
-          };
-        }
-      } else {
-        guests.push({
-          id: Date.now(),
-          guestId: `#${nextGuestIdNumber}`,
-          ...formData,
-        });
-        nextGuestIdNumber += 1;
-      }
-
-      renderGuests();
-      closeModal();
-      alert(editingId ? "Guest updated successfully!" : "Guest added successfully!");
     });
   }
 
-  renderGuests();
+  // Load guests on page load
+  loadGuests();
 }
-

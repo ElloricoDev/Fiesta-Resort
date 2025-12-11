@@ -177,5 +177,15 @@
       </div>
     </section>
   </main>
+
+  <!-- Cancel Booking Confirmation Modal -->
+  <x-client.confirmation-modal 
+    id="cancelBookingModal"
+    title="Cancel Booking"
+    message="Are you sure you want to cancel this booking? This action cannot be undone."
+    confirm-text="Yes, Cancel"
+    cancel-text="Keep Booking"
+    confirm-button-class="logout-modal-btn-delete"
+  />
 @endsection
 
