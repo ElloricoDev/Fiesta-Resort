@@ -10,34 +10,35 @@ const getAsset = (key, fallback = "/assets/FiestaResort1.jpg") => {
   return assets[key] || fallback;
 };
 
+// Hotel data mapping (for backward compatibility)
 const hotelsData = {
-  "blue-origin-farms": {
-    name: "Blue Origin Farms",
-    location: "Galle, Sri Lanka",
+  "fiesta-resort-main": {
+    name: "Fiesta Resort Main",
+    location: "Brgy. Ipil, Surigao City",
     mainImage: getAsset("resort1"),
     secondaryImage: getAsset("resort5"),
   },
-  "ocean-land": {
-    name: "Ocean Land",
-    location: "Trincomalee, Sri Lanka",
+  "ocean-view-villa": {
+    name: "Ocean View Villa",
+    location: "Surigao City",
     mainImage: getAsset("resort2"),
     secondaryImage: getAsset("resort4"),
   },
-  "stark-house": {
-    name: "Stark House",
-    location: "Dehiwala, Sri Lanka",
+  "mountain-peak-resort": {
+    name: "Mountain Peak Resort",
+    location: "Surigao del Norte",
     mainImage: getAsset("resort3"),
     secondaryImage: getAsset("resort5"),
   },
-  "vinna-vill": {
-    name: "Vinna Vill",
-    location: "Beruwala, Sri Lanka",
+  "garden-paradise": {
+    name: "Garden Paradise",
+    location: "Brgy. Ipil, Surigao City",
     mainImage: getAsset("resort4"),
     secondaryImage: getAsset("resort2"),
   },
-  babox: {
-    name: "Babox",
-    location: "Kandy, Sri Lanka",
+  "sunset-bay-resort": {
+    name: "Sunset Bay Resort",
+    location: "Surigao City",
     mainImage: getAsset("resort5"),
     secondaryImage: getAsset("resort3"),
   },
@@ -45,40 +46,75 @@ const hotelsData = {
 
 window.addEventListener("DOMContentLoaded", () => {
   loadHotelDetails();
-  // Hotel details are public - just update UI based on login state
   checkAuthentication();
 });
 
 function loadHotelDetails() {
   const urlParams = new URLSearchParams(window.location.search);
-  const hotelId = urlParams.get("hotel");
+  const hotelParam = urlParams.get("hotel");
+  const roomTypeParam = urlParams.get("room_type");
 
-  if (hotelId && hotelsData[hotelId]) {
-    const hotel = hotelsData[hotelId];
-    document.getElementById("hotelName").textContent = hotel.name;
-    document.getElementById("hotelLocation").textContent = hotel.location;
-
-    const mainImage = document.getElementById("mainImage");
-    const secondaryImage = document.getElementById("secondaryImage");
-
-    mainImage.src = hotel.mainImage;
-    mainImage.alt = `${hotel.name} - Main View`;
-
-    secondaryImage.src = hotel.secondaryImage;
-    secondaryImage.alt = `${hotel.name} - Secondary View`;
-
-    document.title = `${hotel.name} - Fiesta Resort`;
-  } else {
-    const defaultHotel = hotelsData["blue-origin-farms"];
-    document.getElementById("hotelName").textContent = defaultHotel.name;
-    document.getElementById("hotelLocation").textContent = defaultHotel.location;
+  // Check if this is a room type details page (new structure)
+  if (roomTypeParam) {
+    // Room type details page - elements are already set in the view
+    const roomTypeNameEl = document.getElementById("roomTypeName");
+    const resortLocationEl = document.getElementById("resortLocation");
+    
+    // Update title if needed
+    if (roomTypeNameEl) {
+      document.title = `${roomTypeNameEl.textContent} - Fiesta Resort`;
+    }
+    
+    return; // Exit early, no need to process hotel data
   }
+
+  // Legacy hotel details page (for backward compatibility)
+  let hotel = null;
+  if (hotelParam) {
+    const hotelKey = hotelParam.toLowerCase().replace(/\s+/g, "-");
+    hotel = hotelsData[hotelKey];
+  }
+
+  // Use hotel from data or default
+  const hotelName = hotel?.name || hotelParam || "Fiesta Resort";
+  const hotelLocation = hotel?.location || "Brgy. Ipil, Surigao City";
+
+  // Try both old and new element IDs for backward compatibility
+  const hotelNameEl = document.getElementById("hotelName") || document.getElementById("roomTypeName");
+  const hotelLocationEl = document.getElementById("hotelLocation") || document.getElementById("resortLocation");
+  const mainImage = document.getElementById("mainImage");
+  const secondaryImage = document.getElementById("secondaryImage");
+
+  if (hotelNameEl) {
+    hotelNameEl.textContent = hotelName;
+  }
+  if (hotelLocationEl) {
+    hotelLocationEl.textContent = hotelLocation;
+  }
+
+  if (mainImage && hotel?.mainImage) {
+    mainImage.src = hotel.mainImage;
+    mainImage.alt = `${hotelName} - Main View`;
+  }
+
+  if (secondaryImage && hotel?.secondaryImage) {
+    secondaryImage.src = hotel.secondaryImage;
+    secondaryImage.alt = `${hotelName} - Secondary View`;
+  }
+
+  document.title = `${hotelName} - Fiesta Resort`;
 }
 
 // Update UI based on login state (hotel details are public)
 function checkAuthentication() {
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-  const userName = localStorage.getItem("userName") || "User";
+  const isLoggedIn = window.laravelAuth?.isAuthenticated || localStorage.getItem("isLoggedIn") === "true";
+  const userRole = window.laravelAuth?.user?.role || localStorage.getItem("userRole");
+  const userName = window.laravelAuth?.user?.name || localStorage.getItem("userName") || "User";
+
+  // Prevent admins from accessing client pages
+  if (isLoggedIn && userRole === 'admin') {
+    // Don't redirect on hotel details page, just hide the become owner section
+  }
 
   const loginBtn = document.getElementById("loginBtn");
   const userMenu = document.getElementById("userMenu");
@@ -114,14 +150,33 @@ if (userMenuBtn && userDropdown) {
 
 const logoutBtn = document.getElementById("logoutBtn");
 if (logoutBtn) {
-  logoutBtn.addEventListener("click", () => {
+  logoutBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    
+    // If using Laravel auth, submit logout form
+    if (window.laravelAuth?.isAuthenticated) {
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = window.laravelAuth.logoutUrl || "/logout";
+      
+      const csrfToken = document.createElement("input");
+      csrfToken.type = "hidden";
+      csrfToken.name = "_token";
+      csrfToken.value = window.laravelAuth.csrfToken || "";
+      form.appendChild(csrfToken);
+      
+      document.body.appendChild(form);
+      form.submit();
+      return;
+    }
+    
+    // Otherwise, clear localStorage (for dummy users)
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("userName");
     localStorage.removeItem("userEmail");
-    // Navigation handled by HTML links - logout button should be a link
+    localStorage.removeItem("userRole");
     window.location.reload();
   });
 }
 
 // Room card navigation handled by HTML links - no JS routing needed
-

@@ -1,43 +1,75 @@
 // Direct URLs - no routes object needed
 
 document.addEventListener("DOMContentLoaded", function () {
-  const locationFilter = document.getElementById("locationFilter");
   const priceFilter = document.getElementById("priceFilter");
   const sortFilter = document.getElementById("sortFilter");
   const resetFiltersBtn = document.getElementById("resetFilters");
-  const hotelsCount = document.getElementById("hotelsCount");
-  const hotelCards = Array.from(document.querySelectorAll(".hotel-card"));
+  const roomsCount = document.getElementById("roomsCount") || document.getElementById("hotelsCount");
+  const roomCards = Array.from(document.querySelectorAll(".hotel-card"));
 
-  locationFilter.addEventListener("change", applyFilters);
-  priceFilter.addEventListener("change", applyFilters);
-  sortFilter.addEventListener("change", applyFilters);
-  resetFiltersBtn.addEventListener("click", resetFilters);
+  // Check authentication
+  checkAuthentication();
+
+  // Apply filters from URL parameters
+  applyUrlFilters();
+
+  if (priceFilter) {
+    priceFilter.addEventListener("change", applyFilters);
+  }
+  if (sortFilter) {
+    sortFilter.addEventListener("change", applyFilters);
+  }
+  if (resetFiltersBtn) {
+    resetFiltersBtn.addEventListener("click", resetFilters);
+  }
+
+  function checkAuthentication() {
+    const isLoggedIn = window.laravelAuth?.isAuthenticated || localStorage.getItem("isLoggedIn") === "true";
+    const userRole = window.laravelAuth?.user?.role || localStorage.getItem("userRole");
+
+    // Prevent admins from accessing client pages
+    if (isLoggedIn && userRole === 'admin') {
+      if (window.showError) window.showError("Admins cannot access client pages. Redirecting to admin dashboard...");
+      setTimeout(() => {
+        window.location.href = "/admin/dashboard";
+      }, 1000);
+      return;
+    }
+  }
+
+  function applyUrlFilters() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const checkIn = urlParams.get("check_in");
+    const checkOut = urlParams.get("check_out");
+
+    // Apply filters if URL parameters exist
+    if (checkIn || checkOut) {
+      applyFilters();
+    }
+  }
 
   function applyFilters() {
-    const selectedLocation = locationFilter.value.toLowerCase();
+    if (!priceFilter || !sortFilter) return;
+
     const selectedPriceRange = priceFilter.value;
     const selectedSort = sortFilter.value;
 
     let visibleCount = 0;
 
-    hotelCards.forEach((card) => {
-      const location = card.getAttribute("data-location");
+    roomCards.forEach((card) => {
       const price = parseInt(card.getAttribute("data-price"), 10);
 
       let showCard = true;
 
-      if (selectedLocation && location !== selectedLocation) {
-        showCard = false;
-      }
-
-      if (selectedPriceRange) {
-        if (selectedPriceRange === "0-50" && (price < 0 || price > 50)) {
+      // Price filter
+      if (selectedPriceRange && showCard) {
+        if (selectedPriceRange === "0-2000" && (price < 0 || price > 2000)) {
           showCard = false;
-        } else if (selectedPriceRange === "50-100" && (price < 50 || price > 100)) {
+        } else if (selectedPriceRange === "2000-3000" && (price < 2000 || price > 3000)) {
           showCard = false;
-        } else if (selectedPriceRange === "100-500" && (price < 100 || price > 500)) {
+        } else if (selectedPriceRange === "3000-4000" && (price < 3000 || price > 4000)) {
           showCard = false;
-        } else if (selectedPriceRange === "500+" && price < 500) {
+        } else if (selectedPriceRange === "4000+" && price < 4000) {
           showCard = false;
         }
       }
@@ -50,13 +82,17 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
 
-    hotelsCount.textContent = visibleCount;
+    if (roomsCount) {
+      roomsCount.textContent = visibleCount;
+    }
     applySorting(selectedSort);
   }
 
   function applySorting(sortType) {
-    const hotelsGrid = document.querySelector(".hotels-grid");
-    const visibleCards = hotelCards.filter((card) => !card.classList.contains("hidden"));
+    const roomsGrid = document.querySelector(".hotels-grid");
+    if (!roomsGrid) return;
+
+    const visibleCards = roomCards.filter((card) => !card.classList.contains("hidden"));
 
     let sortedCards = [...visibleCards];
 
@@ -71,13 +107,6 @@ document.addEventListener("DOMContentLoaded", function () {
           (a, b) => parseInt(b.getAttribute("data-price"), 10) - parseInt(a.getAttribute("data-price"), 10)
         );
         break;
-      case "rating":
-        sortedCards.sort((a, b) => {
-          const ratingA = parseFloat(a.querySelector(".card-rating span").textContent);
-          const ratingB = parseFloat(b.querySelector(".card-rating span").textContent);
-          return ratingB - ratingA;
-        });
-        break;
       case "featured":
       default:
         sortedCards = visibleCards;
@@ -85,54 +114,42 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     sortedCards.forEach((card) => {
-      hotelsGrid.appendChild(card);
+      roomsGrid.appendChild(card);
     });
   }
 
   function resetFilters() {
-    locationFilter.value = "";
-    priceFilter.value = "";
-    sortFilter.value = "featured";
+    if (priceFilter) priceFilter.value = "";
+    if (sortFilter) sortFilter.value = "featured";
 
-    hotelCards.forEach((card) => {
+    roomCards.forEach((card) => {
       card.classList.remove("hidden");
     });
 
-    hotelsCount.textContent = hotelCards.length;
+    if (roomsCount) {
+      roomsCount.textContent = roomCards.length;
+    }
 
-    const hotelsGrid = document.querySelector(".hotels-grid");
-    hotelCards.forEach((card) => {
-      hotelsGrid.appendChild(card);
-    });
+    const roomsGrid = document.querySelector(".hotels-grid");
+    if (roomsGrid) {
+      roomCards.forEach((card) => {
+        roomsGrid.appendChild(card);
+      });
+    }
+
+    // Clear URL parameters
+    const url = new URL(window.location);
+    url.searchParams.delete("check_in");
+    url.searchParams.delete("check_out");
+    url.searchParams.delete("persons");
+    window.history.replaceState({}, "", url);
   }
 
-  const bookButtons = document.querySelectorAll(".book-now-btn");
-  bookButtons.forEach((button) => {
-    button.addEventListener("click", function () {
-      const hotelCard = this.closest(".hotel-card");
-      const hotelName = hotelCard.querySelector(".card-title").textContent;
-      const hotelPrice = hotelCard.querySelector(".card-price").textContent;
-
-      const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-
-      if (!isLoggedIn) {
-        if (window.showError) window.showError("Please login to book a hotel");
-        // Navigation handled by HTML - redirect to login
-        const loginLink = document.createElement("a");
-        loginLink.href = "/login";
-        document.body.appendChild(loginLink);
-        loginLink.click();
-        document.body.removeChild(loginLink);
-      } else {
-        if (window.showInfo) window.showInfo(`Booking ${hotelName} at ${hotelPrice}. This feature will be implemented soon!`);
-      }
-    });
-  });
-
+  // Book Now buttons are now links, so we don't need the click handler
+  // But we can add hover effects
   document.querySelectorAll(".hotel-card").forEach((card) => {
     card.addEventListener("mouseenter", function () {
       this.style.transition = "all 0.3s ease";
     });
   });
 });
-

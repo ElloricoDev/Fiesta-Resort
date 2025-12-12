@@ -32,8 +32,8 @@
         title="No bookings found"
         description="You haven't made any bookings yet. Start exploring our hotels and rooms!"
         :show-button="true"
-        button-text="Explore Hotels"
-        :button-url="route('client.hotels')"
+        button-text="Explore Rooms"
+        :button-url="route('client.rooms')"
       >
         <x-slot:icon>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="empty-icon">

@@ -46,7 +46,6 @@
 
         <nav class="main-nav">
           <a href="{{ $homeRoute }}#home" class="nav-link scroll-link" data-section="home">Home</a>
-          <a href="{{ $homeRoute }}#hotels" class="nav-link scroll-link" data-section="hotels">Hotels</a>
           <a href="{{ $homeRoute }}#rooms" class="nav-link scroll-link rooms-link" data-section="rooms">Rooms</a>
           <a href="{{ route('client.my-bookings') }}" class="nav-link my-bookings-link {{ request()->routeIs('client.my-bookings') ? 'active' : '' }}" id="myBookingsNavLink" style="display: none;">My Bookings</a>
           <a href="{{ $homeRoute }}#about" class="nav-link scroll-link" data-section="about">About</a>

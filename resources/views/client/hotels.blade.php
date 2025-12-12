@@ -27,12 +27,9 @@
         select-id="locationFilter"
         placeholder="All Locations"
         :options="[
-          'colombo' => 'Colombo',
-          'galle' => 'Galle',
-          'kandy' => 'Kandy',
-          'trincomalee' => 'Trincomalee',
-          'dehiwala' => 'Dehiwala',
-          'beruwala' => 'Beruwala'
+          'surigao-city' => 'Surigao City',
+          'brgy-ipil' => 'Brgy. Ipil',
+          'surigao-del-norte' => 'Surigao del Norte'
         ]"
       >
         <x-slot:icon>
@@ -48,10 +45,10 @@
         select-id="priceFilter"
         placeholder="All Prices"
         :options="[
-          '0-50' => 'Under $50',
-          '50-100' => '$50 - $100',
-          '100-500' => '$100 - $500',
-          '500+' => '$500+'
+          '0-2000' => 'Under ₱2,000',
+          '2000-3000' => '₱2,000 - ₱3,000',
+          '3000-4000' => '₱3,000 - ₱4,000',
+          '4000+' => '₱4,000+'
         ]"
       >
         <x-slot:icon>
@@ -88,30 +85,32 @@
   <section class="all-hotels-section">
     <div class="section-container">
       <div class="hotels-count">
-        <span id="hotelsCount">12</span> hotels found
+        <span id="hotelsCount">{{ $hotels->count() }}</span> hotels found
       </div>
 
+      @if($checkIn && $checkOut)
+        <div class="search-info" style="margin-bottom: 1rem; padding: 1rem; background: #f0f9ff; border-radius: 8px;">
+          <p style="margin: 0; color: #1e40af;">
+            <strong>Search Results:</strong> 
+            Check-in: {{ \Carbon\Carbon::parse($checkIn)->format('M d, Y') }} | 
+            Check-out: {{ \Carbon\Carbon::parse($checkOut)->format('M d, Y') }} | 
+            Guests: {{ $persons }}
+            @if($location)
+              | Location: {{ ucfirst(str_replace('-', ' ', $location)) }}
+            @endif
+          </p>
+        </div>
+      @endif
+
       <div class="hotels-grid">
-        @foreach ([
-            ['title' => 'Blue Origin Farms', 'location' => 'Galle, Sri Lanka', 'price' => 50, 'rating' => 4.8, 'features' => ['Free WiFi', 'Pool', 'Breakfast'], 'image' => 'FiestaResort1.jpg'],
-            ['title' => 'Ocean Land', 'location' => 'Trincomalee, Sri Lanka', 'price' => 22, 'rating' => 4.5, 'features' => ['Free WiFi', 'Parking'], 'image' => 'FiestaResort2.jpg'],
-            ['title' => 'Stark House', 'location' => 'Dehiwala, Sri Lanka', 'price' => 856, 'rating' => 5.0, 'features' => ['Spa', 'Fine Dining', 'Concierge'], 'image' => 'FiestaResort3.jpg', 'badge' => 'Luxury'],
-            ['title' => 'Vinna Vill', 'location' => 'Beruwala, Sri Lanka', 'price' => 62, 'rating' => 4.6, 'features' => ['Garden View', 'Free WiFi', 'Parking'], 'image' => 'FiestaResort4.jpg'],
-            ['title' => 'Babox', 'location' => 'Kandy, Sri Lanka', 'price' => 72, 'rating' => 4.7, 'features' => ['Mountain View', 'Restaurant', 'Pool'], 'image' => 'FiestaResort5.jpg'],
-            ['title' => 'City Central Hotel', 'location' => 'Colombo, Sri Lanka', 'price' => 145, 'rating' => 4.9, 'features' => ['City Center', 'Gym', 'Business Center'], 'image' => 'FiestaResort1.jpg'],
-            ['title' => 'Coastal Paradise', 'location' => 'Galle, Sri Lanka', 'price' => 89, 'rating' => 4.4, 'features' => ['Beach Access', 'Water Sports', 'Kids Club'], 'image' => 'FiestaResort2.jpg'],
-            ['title' => 'Hill Country Manor', 'location' => 'Kandy, Sri Lanka', 'price' => 98, 'rating' => 4.8, 'features' => ['Tea Plantation', 'Hiking', 'Heritage'], 'image' => 'FiestaResort3.jpg'],
-            ['title' => 'Metropolitan Suites', 'location' => 'Colombo, Sri Lanka', 'price' => 175, 'rating' => 4.9, 'features' => ['Rooftop Pool', 'City View', 'Spa'], 'image' => 'FiestaResort4.jpg'],
-            ['title' => 'Sunrise Bay Resort', 'location' => 'Trincomalee, Sri Lanka', 'price' => 55, 'rating' => 4.3, 'features' => ['Diving', 'Snorkeling', 'Beach Bar'], 'image' => 'FiestaResort5.jpg'],
-            ['title' => 'Palm Grove Resort', 'location' => 'Dehiwala, Sri Lanka', 'price' => 120, 'rating' => 4.7, 'features' => ['Garden', 'Restaurant', 'Yoga'], 'image' => 'FiestaResort1.jpg'],
-            ['title' => 'Sunset Beach Villa', 'location' => 'Beruwala, Sri Lanka', 'price' => 78, 'rating' => 4.6, 'features' => ['Private Beach', 'Terrace', 'BBQ'], 'image' => 'FiestaResort2.jpg'],
-        ] as $hotel)
+        @forelse($hotels as $hotel)
           <div class="hotel-card"
             data-location="{{ Str::lower(Str::before($hotel['location'], ',')) }}"
-            data-price="{{ $hotel['price'] }}">
+            data-price="{{ $hotel['price'] }}"
+            data-room-type="{{ $hotel['room_type'] }}">
             <div class="card-image">
               <img src="{{ asset('assets/' . $hotel['image']) }}" alt="{{ $hotel['title'] }}" />
-              <div class="card-price">${{ $hotel['price'] }} per night</div>
+              <div class="card-price">₱{{ number_format($hotel['price'], 0) }} per night</div>
               @if (!empty($hotel['badge']))
                 <div class="card-badge {{ Str::lower($hotel['badge']) }}">{{ $hotel['badge'] }}</div>
               @endif
@@ -128,20 +127,25 @@
               </div>
               <p class="card-location">{{ $hotel['location'] }}</p>
               <p class="card-description">
-                Beautiful beachfront property with stunning ocean views and
-                modern amenities.
+                {{ $hotel['room_count'] }} {{ $hotel['room_count'] == 1 ? 'room' : 'rooms' }} available. Beautiful property with modern amenities.
               </p>
               <div class="card-features">
                 @foreach ($hotel['features'] as $feature)
                   <span class="feature-tag">{{ $feature }}</span>
                 @endforeach
               </div>
-              <button class="book-now-btn" type="button">Book Now</button>
+              <a href="{{ route('client.hotel-details') }}?hotel={{ urlencode($hotel['title']) }}" class="book-now-btn" style="text-decoration: none; display: inline-block; text-align: center;">View Details</a>
             </div>
           </div>
-        @endforeach
+        @empty
+          <div class="empty-hotels-message" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+            <p style="font-size: 1.25rem; color: #64748b; margin-bottom: 1rem;">No hotels found matching your criteria.</p>
+            <button class="reset-filters-btn" onclick="document.getElementById('resetFilters').click()">Reset Filters</button>
+          </div>
+        @endforelse
       </div>
     </div>
   </section>
 @endsection
+
 

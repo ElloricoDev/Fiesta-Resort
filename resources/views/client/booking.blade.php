@@ -41,7 +41,7 @@
             </div>
             <div class="hotel-preview-info">
               <h3 class="hotel-preview-name" id="hotelPreviewName">Blue Origin Fams</h3>
-              <p class="hotel-preview-location" id="hotelPreviewLocation">Galle, Sri Lanka</p>
+              <p class="hotel-preview-location" id="hotelPreviewLocation">Brgy. Ipil, Surigao City</p>
             </div>
           </div>
 
@@ -68,7 +68,9 @@
                     <line x1="3" y1="10" x2="21" y2="10"></line>
                   </svg>
                 </div>
-                <input type="text" class="date-input" id="dateRange" placeholder="Select dates" readonly />
+                <input type="text" class="date-input" id="dateRange" placeholder="Select dates" readonly style="cursor: pointer;" />
+                <input type="date" id="checkInDateInput" style="display: none;" />
+                <input type="date" id="checkOutDateInput" style="display: none;" />
               </div>
             </div>
 
@@ -94,23 +96,23 @@
 
     <section class="booking-step hidden" id="step2">
       <div class="step-container">
-        <h1 class="step-title">Payment</h1>
-        <p class="step-description">Kindly follow the instructions below</p>
+        <h1 class="step-title">Payment Information</h1>
+        <p class="step-description">Please provide your payment details. Payment will be processed upon arrival at the resort.</p>
         <div class="payment-content-grid">
           <div class="transfer-summary">
-            <h3 class="transfer-title">Transfer</h3>
+            <h3 class="transfer-title">Booking Summary</h3>
             <div class="transfer-details">
               <p class="transfer-info">
                 <span id="paymentDays">2</span> Days at
-                <span id="paymentHotel">Blue Origin Fams</span>,
+                <span id="paymentHotel">Fiesta Resort</span>,
               </p>
-              <p class="transfer-location" id="paymentLocation">Galle, Sri Lanka</p>
+              <p class="transfer-location" id="paymentLocation">Brgy. Ipil, Surigao City</p>
               <div class="transfer-pricing">
                 <p class="transfer-total">
-                  Total: <strong id="paymentTotal">2000</strong>
+                  Total Amount: <strong id="paymentTotal">2000</strong>
                 </p>
-                <p class="transfer-initial">
-                  Initial Payment: <strong id="paymentInitial">1500</strong>
+                <p class="transfer-note" style="font-size: 14px; color: #64748b; margin-top: 10px;">
+                  <em>Note: Payment will be collected upon check-in at the resort. This form is for reservation purposes only.</em>
                 </p>
               </div>
             </div>
@@ -119,30 +121,34 @@
           <div class="payment-form-section">
             <form id="paymentForm">
               <div class="form-group">
-                <label class="form-label">GCASH Number</label>
-                <input type="text" class="form-input" id="gcashNumber" placeholder="Payment card number" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Account Name</label>
-                <select class="form-input" id="bankName" required>
-                  <option value="">Select Bank</option>
+                <label class="form-label">Preferred Payment Method (Optional)</label>
+                <select class="form-input" id="bankName">
+                  <option value="">Select Payment Method (Optional)</option>
+                  <option value="Cash">Cash (Pay on Arrival)</option>
+                  <option value="GCASH">GCASH</option>
+                  <option value="PayMaya">PayMaya</option>
                   <option value="BDO">BDO</option>
                   <option value="BPI">BPI</option>
                   <option value="Metrobank">Metrobank</option>
-                  <option value="GCASH">GCASH</option>
-                  <option value="PayMaya">PayMaya</option>
                 </select>
+                <small style="display: block; margin-top: 5px; color: #64748b; font-size: 13px;">
+                  This is for reference only. Actual payment will be processed at the resort.
+                </small>
               </div>
               <div class="form-group">
-                <label class="form-label">Validation Date</label>
-                <input type="date" class="form-input" id="validationDate" required />
+                <label class="form-label">Contact Number (Optional)</label>
+                <input type="text" class="form-input" id="gcashNumber" placeholder="Enter your contact number (e.g., 09XXXXXXXXX)" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Special Requests or Notes (Optional)</label>
+                <textarea class="form-input" id="validationDate" rows="3" placeholder="Any special requests or notes for your stay..."></textarea>
               </div>
             </form>
           </div>
         </div>
 
         <div class="step-actions">
-          <button class="btn-primary" id="completePayment" type="button">Pay Now</button>
+          <button class="btn-primary" id="completePayment" type="button">Submit Reservation</button>
           <button class="btn-secondary" id="backToBooking" type="button">Cancel</button>
         </div>
       </div>

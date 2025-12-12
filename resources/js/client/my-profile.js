@@ -1,5 +1,13 @@
 // My Profile Page functionality
 
+const apiBaseUrl = "/client/profile";
+
+// Get CSRF token from meta tag
+function getCsrfToken() {
+  const metaTag = document.querySelector('meta[name="csrf-token"]');
+  return metaTag ? metaTag.getAttribute("content") : "";
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   // Check if user is logged in
   const isLoggedIn = window.laravelAuth?.isAuthenticated || localStorage.getItem("isLoggedIn") === "true";
@@ -31,11 +39,77 @@ document.addEventListener("DOMContentLoaded", function () {
   loadBookingStats();
   loadRecentBookings();
   loadPreferences();
+  updateLastLogin();
 });
 
-// Load profile data from localStorage
-function loadProfileData() {
-  const userEmail = localStorage.getItem("userEmail") || "";
+// Load profile data from API
+async function loadProfileData() {
+  try {
+    const url = apiBaseUrl || "/client/profile";
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      credentials: "same-origin",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to load profile");
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.data) {
+      const profile = result.data;
+
+      // Update header
+      const profileNameEl = document.getElementById("profileName");
+      const profileEmailEl = document.getElementById("profileEmail");
+      
+      if (profileNameEl) {
+        profileNameEl.textContent = profile.name || `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || "User";
+      }
+      
+      if (profileEmailEl) {
+        profileEmailEl.textContent = profile.email || "";
+      }
+
+      // Populate personal info form
+      const firstNameEl = document.getElementById("firstName");
+      const lastNameEl = document.getElementById("lastName");
+      const emailEl = document.getElementById("email");
+      const phoneEl = document.getElementById("phone");
+      const addressEl = document.getElementById("address");
+
+      if (firstNameEl) firstNameEl.value = profile.firstName || "";
+      if (lastNameEl) lastNameEl.value = profile.lastName || "";
+      if (emailEl) emailEl.value = profile.email || "";
+      if (phoneEl) phoneEl.value = profile.phone || "";
+      
+      // Parse address if it exists
+      if (addressEl && profile.address) {
+        // Try to split address into parts
+        const addressParts = profile.address.split(',').map(s => s.trim());
+        addressEl.value = addressParts[0] || "";
+        
+        const cityEl = document.getElementById("city");
+        const countryEl = document.getElementById("country");
+        if (cityEl && addressParts.length > 1) cityEl.value = addressParts[1] || "";
+        if (countryEl && addressParts.length > 2) countryEl.value = addressParts[2] || "";
+      }
+    }
+  } catch (error) {
+    console.error("Error loading profile:", error);
+    // Fallback to localStorage if API fails
+    loadProfileDataFromLocalStorage();
+  }
+}
+
+// Fallback to localStorage
+function loadProfileDataFromLocalStorage() {
+  const userEmail = window.laravelAuth?.user?.email || localStorage.getItem("userEmail") || "";
   const savedProfile = localStorage.getItem("userProfile");
   
   const profile = savedProfile
@@ -65,7 +139,7 @@ function loadProfileData() {
     profileEmailEl.textContent = profile.email || userEmail;
   }
 
-  // Populate personal info form
+  // Populate form
   const firstNameEl = document.getElementById("firstName");
   const lastNameEl = document.getElementById("lastName");
   const emailEl = document.getElementById("email");
@@ -144,7 +218,7 @@ function setupForms() {
 }
 
 // Save personal information
-function savePersonalInfo() {
+async function savePersonalInfo() {
   const firstName = document.getElementById("firstName")?.value.trim() || "";
   const lastName = document.getElementById("lastName")?.value.trim() || "";
   const email = document.getElementById("email")?.value.trim() || "";
@@ -170,31 +244,50 @@ function savePersonalInfo() {
     return;
   }
 
-  const profile = {
-    firstName,
-    lastName,
-    email,
-    phone,
-    dateOfBirth,
-    address,
-    city,
-    country,
-  };
+  try {
+    const url = apiBaseUrl || "/client/profile";
+    const response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRF-TOKEN": getCsrfToken(),
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        firstName,
+        lastName,
+        email,
+        phone,
+        dateOfBirth,
+        address,
+        city,
+        country,
+      }),
+    });
 
-  localStorage.setItem("userProfile", JSON.stringify(profile));
-  
-  // Update header
-  const profileNameEl = document.getElementById("profileName");
-  if (profileNameEl) {
-    profileNameEl.textContent = `${firstName} ${lastName}`.trim();
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Failed to update profile");
+    }
+
+    // Update header
+    const profileNameEl = document.getElementById("profileName");
+    if (profileNameEl && result.data) {
+      profileNameEl.textContent = result.data.name || `${firstName} ${lastName}`.trim();
+    }
+
+    if (window.showSuccess) window.showSuccess(result.message || "Profile updated successfully!");
+    switchTab("overview");
+  } catch (error) {
+    console.error("Error saving profile:", error);
+    if (window.showError) window.showError(error.message || "Failed to update profile. Please try again.");
   }
-
-  if (window.showSuccess) window.showSuccess("Profile updated successfully!");
-  switchTab("overview");
 }
 
 // Change password
-function changePassword() {
+async function changePassword() {
   const currentPassword = document.getElementById("currentPassword")?.value || "";
   const newPassword = document.getElementById("newPassword")?.value || "";
   const confirmPassword = document.getElementById("confirmPassword")?.value || "";
@@ -214,29 +307,95 @@ function changePassword() {
     return;
   }
 
-  // In a real app, this would make an API call
-  if (window.showSuccess) window.showSuccess("Password changed successfully!");
-  
-  // Clear password fields
-  document.getElementById("currentPassword").value = "";
-  document.getElementById("newPassword").value = "";
-  document.getElementById("confirmPassword").value = "";
+  try {
+    const url = (apiBaseUrl || "/client/profile") + "/password";
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRF-TOKEN": getCsrfToken(),
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Failed to change password");
+    }
+
+    if (window.showSuccess) window.showSuccess(result.message || "Password changed successfully!");
+    
+    // Clear password fields
+    document.getElementById("currentPassword").value = "";
+    document.getElementById("newPassword").value = "";
+    document.getElementById("confirmPassword").value = "";
+  } catch (error) {
+    console.error("Error changing password:", error);
+    if (window.showError) window.showError(error.message || "Failed to change password. Please try again.");
+  }
 }
 
-// Load booking statistics
-function loadBookingStats() {
-  const bookings = JSON.parse(localStorage.getItem("userBookings") || "[]");
+// Load booking statistics from API
+async function loadBookingStats() {
+  try {
+    const url = (apiBaseUrl || "/client/profile") + "/stats";
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      credentials: "same-origin",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to load stats");
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.data) {
+      const stats = result.data;
+
+      const totalBookingsEl = document.getElementById("totalBookings");
+      const completedBookingsEl = document.getElementById("completedBookings");
+      const upcomingBookingsEl = document.getElementById("upcomingBookings");
+      const totalSpentEl = document.getElementById("totalSpent");
+
+      if (totalBookingsEl) totalBookingsEl.textContent = stats.totalBookings || 0;
+      if (completedBookingsEl) completedBookingsEl.textContent = stats.completedBookings || 0;
+      if (upcomingBookingsEl) upcomingBookingsEl.textContent = stats.upcomingBookings || 0;
+      if (totalSpentEl) totalSpentEl.textContent = `₱${parseFloat(stats.totalSpent || 0).toLocaleString()}`;
+    }
+  } catch (error) {
+    console.error("Error loading stats:", error);
+    // Fallback to localStorage
+    loadBookingStatsFromLocalStorage();
+  }
+}
+
+// Fallback to localStorage
+function loadBookingStatsFromLocalStorage() {
+  const bookings = JSON.parse(localStorage.getItem("myBookings") || "[]");
   
   const totalBookings = bookings.length;
   const completedBookings = bookings.filter(
-    (b) => b.status === "completed"
+    (b) => b.status === "completed" || b.status === "checked-in"
   ).length;
   const upcomingBookings = bookings.filter(
-    (b) => b.status === "upcoming" || b.status === "confirmed"
+    (b) => b.status === "upcoming" || b.status === "confirmed" || b.status === "pending"
   ).length;
   const totalSpent = bookings
-    .filter((b) => b.status === "completed")
-    .reduce((sum, b) => sum + (parseFloat(b.totalPrice) || 0), 0);
+    .filter((b) => b.status === "completed" || b.status === "checked-in")
+    .reduce((sum, b) => sum + (parseFloat(b.total || b.totalPrice) || 0), 0);
 
   const totalBookingsEl = document.getElementById("totalBookings");
   const completedBookingsEl = document.getElementById("completedBookings");
@@ -246,12 +405,78 @@ function loadBookingStats() {
   if (totalBookingsEl) totalBookingsEl.textContent = totalBookings;
   if (completedBookingsEl) completedBookingsEl.textContent = completedBookings;
   if (upcomingBookingsEl) upcomingBookingsEl.textContent = upcomingBookings;
-  if (totalSpentEl) totalSpentEl.textContent = `$${totalSpent.toFixed(2)}`;
+  if (totalSpentEl) totalSpentEl.textContent = `₱${totalSpent.toLocaleString()}`;
 }
 
-// Load recent bookings
-function loadRecentBookings() {
-  const bookings = JSON.parse(localStorage.getItem("userBookings") || "[]");
+// Load recent bookings from API
+async function loadRecentBookings() {
+  try {
+    const url = (apiBaseUrl || "/client/profile") + "/recent-bookings";
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      credentials: "same-origin",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to load bookings");
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.data) {
+      const bookings = result.data;
+      const recentBookingsList = document.getElementById("recentBookingsList");
+
+      if (!recentBookingsList) return;
+
+      if (bookings.length === 0) {
+        recentBookingsList.innerHTML = '<p class="empty-message">No recent bookings</p>';
+        return;
+      }
+
+      recentBookingsList.innerHTML = bookings
+        .map((booking) => {
+          const checkIn = new Date(booking.checkIn).toLocaleDateString();
+          const checkOut = new Date(booking.checkOut).toLocaleDateString();
+          const statusClass = booking.status === 'confirmed' ? 'confirmed' : 
+                            booking.status === 'checked-in' ? 'checked-in' : 
+                            booking.status === 'cancelled' ? 'cancelled' : 'pending';
+          return `
+            <div class="activity-item">
+              <div class="activity-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+              </div>
+              <div class="activity-info">
+                <h4>${booking.hotel || booking.room_type || "Booking"}</h4>
+                <p>${checkIn} - ${checkOut}</p>
+              </div>
+              <div class="activity-status">
+                <span class="status-badge status-${statusClass}">${booking.status}</span>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    }
+  } catch (error) {
+    console.error("Error loading bookings:", error);
+    // Fallback to localStorage
+    loadRecentBookingsFromLocalStorage();
+  }
+}
+
+// Fallback to localStorage
+function loadRecentBookingsFromLocalStorage() {
+  const bookings = JSON.parse(localStorage.getItem("myBookings") || "[]");
   const recentBookings = bookings.slice(0, 5);
   const recentBookingsList = document.getElementById("recentBookingsList");
 
@@ -264,8 +489,11 @@ function loadRecentBookings() {
 
   recentBookingsList.innerHTML = recentBookings
     .map((booking) => {
-      const checkIn = new Date(booking.checkIn).toLocaleDateString();
-      const checkOut = new Date(booking.checkOut).toLocaleDateString();
+      const checkIn = booking.checkIn ? new Date(booking.checkIn).toLocaleDateString() : "N/A";
+      const checkOut = booking.checkOut ? new Date(booking.checkOut).toLocaleDateString() : "N/A";
+      const statusClass = booking.status === 'confirmed' ? 'confirmed' : 
+                        booking.status === 'checked-in' ? 'checked-in' : 
+                        booking.status === 'cancelled' ? 'cancelled' : 'pending';
       return `
         <div class="activity-item">
           <div class="activity-icon">
@@ -281,7 +509,7 @@ function loadRecentBookings() {
             <p>${checkIn} - ${checkOut}</p>
           </div>
           <div class="activity-status">
-            <span class="status-badge status-${booking.status}">${booking.status}</span>
+            <span class="status-badge status-${statusClass}">${booking.status}</span>
           </div>
         </div>
       `;
@@ -307,7 +535,7 @@ function loadPreferences() {
     promotionalEmails.checked = preferences.promotionalEmails !== false;
   if (bookingReminders)
     bookingReminders.checked = preferences.bookingReminders !== false;
-  if (currency) currency.value = preferences.currency || "USD";
+  if (currency) currency.value = preferences.currency || "PHP";
   if (language) language.value = preferences.language || "en";
 }
 
@@ -317,7 +545,7 @@ window.savePreferences = function () {
     emailNotifications: document.getElementById("emailNotifications")?.checked || false,
     promotionalEmails: document.getElementById("promotionalEmails")?.checked || false,
     bookingReminders: document.getElementById("bookingReminders")?.checked || false,
-    currency: document.getElementById("currency")?.value || "USD",
+    currency: document.getElementById("currency")?.value || "PHP",
     language: document.getElementById("language")?.value || "en",
   };
 
@@ -339,6 +567,3 @@ function updateLastLogin() {
     }
   }
 }
-
-updateLastLogin();
-

@@ -16,7 +16,7 @@
         <button class="show-more-btn">Show More</button>
 
         <div class="stats-container">
-          <x-client.stat-item value="2500" label="Users">
+          <x-client.stat-item value="{{ $totalUsers ?? 0 }}" label="Users">
             <x-slot:icon>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -26,7 +26,7 @@
               </svg>
             </x-slot:icon>
           </x-client.stat-item>
-          <x-client.stat-item value="200" label="Treasure">
+          <x-client.stat-item value="{{ $totalRooms ?? 0 }}" label="Rooms">
             <x-slot:icon>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -35,7 +35,7 @@
               </svg>
             </x-slot:icon>
           </x-client.stat-item>
-          <x-client.stat-item value="100" label="Cities">
+          <x-client.stat-item value="{{ $totalReservations ?? 0 }}" label="Bookings">
             <x-slot:icon>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
@@ -52,20 +52,32 @@
     </div>
   </section>
 
-  <section class="search-section">
+  <section class="search-section" data-rooms-url="{{ route('client.rooms') }}">
     <div class="search-container">
       <div class="search-bar">
-        <button class="search-field">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="search-field" id="checkInBtn" style="position: relative; cursor: pointer;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events: none;">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
             <line x1="16" y1="2" x2="16" y2="6"></line>
             <line x1="8" y1="2" x2="8" y2="6"></line>
             <line x1="3" y1="10" x2="21" y2="10"></line>
           </svg>
-          <span>Check Available</span>
-        </button>
+          <span id="checkInText" style="pointer-events: none;">Check In</span>
+          <input type="date" id="checkInDate" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.01; z-index: 10; cursor: pointer;" />
+        </div>
 
-        <div class="search-field-dropdown">
+        <div class="search-field" id="checkOutBtn" style="position: relative; cursor: pointer;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events: none;">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span id="checkOutText" style="pointer-events: none;">Check Out</span>
+          <input type="date" id="checkOutDate" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.01; z-index: 10; cursor: pointer;" />
+        </div>
+
+        <div class="search-field-dropdown" id="personDropdown">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
             <circle cx="9" cy="7" r="4"></circle>
@@ -73,80 +85,69 @@
             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
           </svg>
           <span class="dropdown-label">Person</span>
-          <span class="dropdown-value">2</span>
+          <span class="dropdown-value" id="personValue">2</span>
           <svg class="dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
+          <div class="person-dropdown-menu" id="personMenu" style="display: none; position: absolute; z-index: 1000;">
+            @for($i = 1; $i <= 10; $i++)
+              <div class="person-option" data-value="{{ $i }}">{{ $i }} {{ $i === 1 ? 'Person' : 'People' }}</div>
+            @endfor
+          </div>
         </div>
 
-        <button class="search-field">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3"></circle>
-          </svg>
-          <span>Select Location</span>
-        </button>
-
-        <button class="search-btn">Search</button>
-      </div>
-    </div>
-  </section>
-
-  <section class="hotels-section" id="hotels">
-    <div class="section-container">
-      <div class="section-header">
-        <h2 class="section-title">Hotels</h2>
-        <a href="{{ route('client.hotels') }}" class="view-all-btn">View All</a>
-      </div>
-      <div class="hotels-grid">
-        @foreach ([
-            ['title' => 'Blue Origin Farms', 'location' => 'Galle, Sri Lanka', 'price' => 50, 'rating' => 4.8, 'features' => ['Free WiFi', 'Pool'], 'image' => 'FiestaResort1.jpg'],
-            ['title' => 'Ocean Land', 'location' => 'Trincomalee, Sri Lanka', 'price' => 22, 'rating' => 4.5, 'features' => ['Free WiFi'], 'image' => 'FiestaResort2.jpg'],
-            ['title' => 'Stark House', 'location' => 'Dehiwala, Sri Lanka', 'price' => 856, 'rating' => 5.0, 'features' => ['Spa', 'Fine Dining'], 'image' => 'FiestaResort3.jpg'],
-            ['title' => 'Vinna Vill', 'location' => 'Beruwala, Sri Lanka', 'price' => 62, 'rating' => 4.6, 'features' => ['Garden View'], 'image' => 'FiestaResort4.jpg'],
-            ['title' => 'Babox', 'location' => 'Kandy, Sri Lanka', 'price' => 72, 'rating' => 4.7, 'features' => ['Mountain View'], 'image' => 'FiestaResort5.jpg'],
-        ] as $hotel)
-          <x-client.hotel-card 
-            title="{{ $hotel['title'] }}"
-            location="{{ $hotel['location'] }}"
-            :price="$hotel['price']"
-            :rating="$hotel['rating']"
-            image="{{ $hotel['image'] }}"
-            :features="$hotel['features']"
-            :url="route('client.hotel-details') . '?hotel=' . strtolower(str_replace(' ', '-', $hotel['title']))"
-          >
-            Beautiful property with modern amenities.
-          </x-client.hotel-card>
-        @endforeach
+        <button class="search-btn" id="searchBtn" type="button">Search</button>
       </div>
     </div>
   </section>
 
   <section class="rooms-section" id="rooms">
     <div class="section-container">
-      <h2 class="section-title">Rooms</h2>
+      <div class="section-header">
+        <h2 class="section-title">Our Rooms</h2>
+        <a href="{{ route('client.rooms') }}" class="view-all-btn">View All</a>
+      </div>
+      <p class="section-description" style="text-align: center; margin-bottom: 2rem; color: #64748b;">
+        Choose from our selection of comfortable and well-appointed rooms at Fiesta Resort, Brgy. Ipil, Surigao City
+      </p>
       <div class="rooms-grid">
-        @foreach ([
-            ['title' => 'Shangri-La', 'location' => 'Colombo, Sri Lanka', 'image' => 'FiestaResort1.jpg', 'type' => 'single', 'badge' => 'Popular Choice'],
-            ['title' => 'Top View', 'location' => 'Hikkaduwa, Sri Lanka', 'image' => 'FiestaResort2.jpg', 'type' => 'double'],
-            ['title' => 'Green Villa', 'location' => 'Kandy, Sri Lanka', 'image' => 'FiestaResort3.jpg', 'type' => 'deluxe'],
-            ['title' => 'Wodden Pit', 'location' => 'Ambalangoda, Sri Lanka', 'image' => 'FiestaResort4.jpg', 'type' => 'suite'],
-            ['title' => 'Boutiqe', 'location' => 'Kandy, Sri Lanka', 'image' => 'FiestaResort5.jpg', 'type' => 'single'],
-            ['title' => 'Modern', 'location' => 'Nuwereeliya, Sri Lanka', 'image' => 'FiestaResort1.jpg', 'type' => 'double'],
-            ['title' => 'Silver Rain', 'location' => 'Dehiwala, Sri Lanka', 'image' => 'FiestaResort2.jpg', 'type' => 'deluxe'],
-            ['title' => 'Cashville', 'location' => 'Ampara, Sri Lanka', 'image' => 'FiestaResort3.jpg', 'type' => 'suite', 'badge' => 'Popular Choice'],
-        ] as $room)
+        @php
+          use App\Models\Room;
+          $roomTypes = Room::where('status', 'available')
+            ->selectRaw('room_type, MIN(price_per_night) as min_price, COUNT(*) as room_count')
+            ->groupBy('room_type')
+            ->orderBy('min_price')
+            ->limit(4)
+            ->get();
+          
+          $roomTypeInfo = [
+            'Standard Room' => ['image' => 'FiestaResort1.jpg', 'badge' => 'Popular', 'features' => ['Free WiFi', 'Pool Access', 'Breakfast']],
+            'Deluxe King Suite' => ['image' => 'FiestaResort2.jpg', 'badge' => null, 'features' => ['Free WiFi', 'King Bed', 'Ocean View']],
+            'Executive Suite' => ['image' => 'FiestaResort3.jpg', 'badge' => 'Luxury', 'features' => ['Free WiFi', 'Spa Access', 'Concierge']],
+            'Presidential Suite' => ['image' => 'FiestaResort4.jpg', 'badge' => 'Premium', 'features' => ['Free WiFi', 'Private Pool', 'Butler Service']],
+          ];
+        @endphp
+        @forelse($roomTypes as $roomType)
+          @php
+            $info = $roomTypeInfo[$roomType->room_type] ?? ['image' => 'FiestaResort1.jpg', 'badge' => null, 'features' => ['Free WiFi', 'Modern Amenities']];
+            $roomTypeSlug = strtolower(str_replace(' ', '-', $roomType->room_type));
+          @endphp
           <x-client.hotel-card 
-            title="{{ $room['title'] }}"
-            location="{{ $room['location'] }}"
-            :price="0"
+            title="{{ $roomType->room_type }}"
+            location="Brgy. Ipil, Surigao City"
+            :price="(int)$roomType->min_price"
             :rating="0"
-            image="{{ $room['image'] }}"
-            badge="{{ $room['badge'] ?? null }}"
-            :url="route('client.room-details') . '?room=' . $room['type'] . '&hotel=' . urlencode($room['title'])"
-            :data-attributes="['room-type' => $room['type'], 'room-name' => $room['title']]"
-          />
-        @endforeach
+            image="{{ $info['image'] }}"
+            badge="{{ $info['badge'] }}"
+            :features="$info['features']"
+            :url="route('client.room-type-details') . '?room_type=' . urlencode($roomType->room_type)"
+            :data-attributes="['room-type' => $roomTypeSlug, 'room-name' => $roomType->room_type]"
+          >
+            {{ $roomType->room_count }} {{ $roomType->room_count == 1 ? 'room' : 'rooms' }} available from ₱{{ number_format($roomType->min_price, 0) }} per night
+          </x-client.hotel-card>
+        @empty
+          <p style="grid-column: 1 / -1; text-align: center; color: #64748b;">No rooms available at the moment.</p>
+        @endforelse
       </div>
     </div>
   </section>
@@ -235,8 +236,9 @@
           </p>
           <div class="contact-block">
             <h4 class="contact-heading">Address</h4>
-            <p class="contact-detail">123 Resort Avenue</p>
-            <p class="contact-detail">456 Brgy Ipil</p>
+            <p class="contact-detail">Sitio Dacuman, Barangay Ipil</p>
+            <p class="contact-detail">Surigao City, Surigao del Norte, 8400</p>
+            <p class="contact-detail">Philippines</p>
           </div>
           <div class="contact-block">
             <h4 class="contact-heading">Phone</h4>
@@ -255,7 +257,7 @@
           </div>
         </div>
 
-        <div class="contact-form-wrapper">
+        <div class="contact-form-wrapper" data-contact-url="{{ route('contact.store') }}">
           <h3 class="contact-subtitle">Send us a Message</h3>
           <form class="contact-form" id="contactForm">
             <div class="form-field">

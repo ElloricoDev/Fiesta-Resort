@@ -26,7 +26,7 @@
     <div class="room-details-container">
       <div class="room-header">
         <h1 class="room-title" id="roomTitle">Blue Origin Fams</h1>
-        <p class="room-location" id="roomLocation">Galle, Sri Lanka</p>
+        <p class="room-location" id="roomLocation">Brgy. Ipil, Surigao City</p>
       </div>
 
       <div class="room-image-wrapper">

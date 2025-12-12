@@ -1,98 +1,80 @@
 // Room Details Page functionality
 
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
   // Get room data from URL parameters
   const urlParams = new URLSearchParams(window.location.search);
-  const roomId = urlParams.get("room");
+  const roomTypeParam = urlParams.get("room_type") || urlParams.get("room");
   const hotelName = urlParams.get("hotel");
 
-  // Sample room data (in a real app, this would come from a database/API)
-  const roomsData = {
-    single: {
-      title: "Blue Origin Fams",
-      location: "Galle, Sri Lanka",
-      price: 200,
-      image: "/assets/FiestaResort1.jpg",
-      description: [
-        "Minimal techno is a minimalist subgenre of techno music. It is characterized by a stripped-down aesthetic that exploits the use of repetition and understated development. Minimal techno is thought to have been originally developed in the early 1990s by Detroit-based producers Robert Hood and Daniel Bell.",
-        "Such trends saw the demise of the soul-infused techno that typified the original Detroit sound. Robert Hood has noted that he and Daniel Bell both realized something was missing from techno in the post-rave era.",
-      ],
-      amenities: {
-        bedrooms: 1,
-        livingRooms: 1,
-        bathrooms: 1,
-        diningRooms: 1,
-        wifi: 10,
-        unitReady: 7,
-        refrigerator: 1,
-        television: 2,
-      },
+  const fallbackRoom = {
+    room_type: roomTypeParam || "Standard Room",
+    title: roomTypeParam || "Standard Room",
+    location: "Brgy. Ipil, Surigao City",
+    price_per_night: 2000,
+    image: "/assets/FiestaResort1.jpg",
+    amenities: {
+      bedrooms: 1,
+      livingRooms: 1,
+      bathrooms: 1,
+      diningRooms: 1,
+      wifi: 10,
+      unitReady: 1,
+      refrigerator: 1,
+      television: 1,
     },
-    double: {
-      title: "Ocean View Suite",
-      location: "Colombo, Sri Lanka",
-      price: 350,
-      image: "/assets/FiestaResort2.jpg",
-      description: [
-        "Experience luxury at its finest in our Ocean View Suite. This spacious room offers breathtaking panoramic views of the Indian Ocean, complemented by modern amenities and elegant furnishings.",
-        "Perfect for couples or small families, the suite features a separate living area, premium bedding, and a private balcony where you can enjoy stunning sunsets.",
-      ],
-      amenities: {
-        bedrooms: 2,
-        livingRooms: 1,
-        bathrooms: 2,
-        diningRooms: 1,
-        wifi: 50,
-        unitReady: 5,
-        refrigerator: 1,
-        television: 3,
-      },
-    },
-    deluxe: {
-      title: "Deluxe Garden Villa",
-      location: "Kandy, Sri Lanka",
-      price: 500,
-      image: "/assets/FiestaResort3.jpg",
-      description: [
-        "Immerse yourself in tropical paradise with our Deluxe Garden Villa. Surrounded by lush greenery and exotic flowers, this villa offers complete privacy and tranquility.",
-        "Features include a private plunge pool, outdoor shower, king-size bed, and a spacious terrace perfect for morning coffee or evening relaxation.",
-      ],
-      amenities: {
-        bedrooms: 3,
-        livingRooms: 2,
-        bathrooms: 3,
-        diningRooms: 1,
-        wifi: 100,
-        unitReady: 3,
-        refrigerator: 2,
-        television: 4,
-      },
-    },
-    suite: {
-      title: "Presidential Suite",
-      location: "Dehiwala, Sri Lanka",
-      price: 850,
-      image: "/assets/FiestaResort4.jpg",
-      description: [
-        "The epitome of luxury, our Presidential Suite offers unmatched comfort and sophistication. Spanning over 200 square meters, this suite is designed for discerning guests who expect nothing but the best.",
-        "Enjoy exclusive amenities including a private butler service, in-suite dining, home theater system, and panoramic ocean views from every room.",
-      ],
-      amenities: {
-        bedrooms: 4,
-        livingRooms: 3,
-        bathrooms: 4,
-        diningRooms: 2,
-        wifi: 200,
-        unitReady: 2,
-        refrigerator: 2,
-        television: 5,
-      },
-    },
+    description: [
+      "Enjoy a comfortable stay at Fiesta Resort with essential amenities.",
+    ],
   };
 
-  // Load room data
-  function loadRoomData() {
-    const room = roomsData[roomId] || roomsData.single;
+  async function fetchRoomData() {
+    if (!roomTypeParam) {
+      return fallbackRoom;
+    }
+
+    try {
+      const response = await fetch(`/rooms/list?room_type=${encodeURIComponent(roomTypeParam)}`, {
+        headers: { "Accept": "application/json" },
+      });
+      const result = await response.json();
+      if (!response.ok || !result?.data) {
+        return fallbackRoom;
+      }
+
+      const rooms = result.data;
+      if (!rooms.length) {
+        return fallbackRoom;
+      }
+
+      const room = rooms[0]; // first available room of that type
+      return {
+        room_type: room.room_type,
+        title: room.room_type,
+        location: "Brgy. Ipil, Surigao City",
+        price_per_night: room.price_per_night || 2000,
+        image: "/assets/FiestaResort1.jpg",
+        amenities: {
+          bedrooms: room.bedrooms || 1,
+          livingRooms: room.living_rooms || 1,
+          bathrooms: room.bathrooms || 1,
+          diningRooms: room.dining_rooms || 1,
+          wifi: 10,
+          unitReady: 1,
+          refrigerator: 1,
+          television: 1,
+        },
+        description: [
+          room.description || "Comfortable room at Fiesta Resort.",
+        ],
+      };
+    } catch (e) {
+      console.error("Failed to load room data:", e);
+      return fallbackRoom;
+    }
+  }
+
+  async function loadRoomData() {
+    const room = await fetchRoomData();
 
     // Update page content
     const roomTitleEl = document.getElementById("roomTitle");
@@ -100,26 +82,26 @@ document.addEventListener("DOMContentLoaded", function () {
     const roomImageEl = document.getElementById("roomImage");
     const priceAmountEl = document.getElementById("priceAmount");
 
-    if (roomTitleEl) roomTitleEl.textContent = room.title;
-    if (roomLocationEl) roomLocationEl.textContent = room.location;
+    if (roomTitleEl) roomTitleEl.textContent = room.title || room.room_type;
+    if (roomLocationEl) roomLocationEl.textContent = room.location || "Brgy. Ipil, Surigao City";
     if (roomImageEl) {
       roomImageEl.src = room.image;
-      roomImageEl.alt = room.title;
+      roomImageEl.alt = room.title || room.room_type;
     }
-    if (priceAmountEl) priceAmountEl.textContent = `$${room.price}`;
+    if (priceAmountEl) priceAmountEl.textContent = `₱${Number(room.price_per_night || 0).toLocaleString()} per night`;
 
     // Update description
     const aboutTextDiv = document.querySelector(".about-text");
     if (aboutTextDiv) {
       aboutTextDiv.innerHTML = "";
-      room.description.forEach((paragraph) => {
+      (room.description || []).forEach((paragraph) => {
         const p = document.createElement("p");
         p.textContent = paragraph;
         aboutTextDiv.appendChild(p);
       });
     }
 
-    // Update amenities
+    // Update amenities (if present)
     const amenityIds = {
       bedrooms: "bedrooms",
       livingRooms: "livingRooms",
@@ -133,14 +115,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
     Object.keys(amenityIds).forEach((key) => {
       const el = document.getElementById(amenityIds[key]);
-      if (el) el.textContent = room.amenities[key];
+      if (el && room.amenities && room.amenities[key] !== undefined) {
+        el.textContent = room.amenities[key];
+      }
     });
 
     // Update page title
-    document.title = `${room.title} - Fiesta Resort`;
+    document.title = `${room.title || room.room_type} - Fiesta Resort`;
 
-    // Store room data for booking
-    sessionStorage.setItem("selectedRoom", JSON.stringify(room));
+    // Store room data for booking (use actual room_type)
+    sessionStorage.setItem("selectedRoom", JSON.stringify({
+      roomType: room.room_type,
+      title: room.title || room.room_type,
+      location: room.location,
+      price: room.price_per_night,
+      image: room.image,
+    }));
   }
 
   // Load room data on page load
@@ -150,25 +140,41 @@ document.addEventListener("DOMContentLoaded", function () {
   const bookNowBtn = document.getElementById("bookNowBtn");
   if (bookNowBtn) {
     bookNowBtn.addEventListener("click", function (e) {
-      // Check if user is logged in
-      const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+      // Check if user is logged in - check both Laravel auth and localStorage
+      const isLoggedIn = window.laravelAuth?.isAuthenticated || localStorage.getItem("isLoggedIn") === "true";
+      const userRole = window.laravelAuth?.user?.role || localStorage.getItem("userRole");
 
-      if (!isLoggedIn) {
+      // Prevent admins from booking
+      if (isLoggedIn && userRole === 'admin') {
         e.preventDefault();
-        if (window.showError) window.showError("Please login to book this room");
-        // Store the current page URL to redirect back after login
-        sessionStorage.setItem("redirectAfterLogin", window.location.href);
-        // Change href to login page
-        this.href = "/login";
-        this.click();
+        if (window.showError) {
+          window.showError("Admins cannot make bookings. Please use a regular user account.");
+        } else {
+          alert("Admins cannot make bookings. Please use a regular user account.");
+        }
         return;
       }
 
+      if (!isLoggedIn) {
+        e.preventDefault();
+        if (window.showError) {
+          window.showError("Please login to book this room");
+        } else {
+          alert("Please login to book this room");
+        }
+        // Store the current page URL to redirect back after login
+        sessionStorage.setItem("redirectAfterLogin", window.location.href);
+        // Redirect to login page
+        window.location.href = "/login";
+        return;
+      }
+
+      // User is logged in, proceed with booking
       // Get room data and store for booking page
       const roomData = JSON.parse(sessionStorage.getItem("selectedRoom") || "{}");
       const bookingData = {
         room: roomData,
-        hotel: hotelName || "Blue Origin Farms",
+        hotel: hotelName || "Fiesta Resort",
         date: new Date().toISOString(),
       };
       sessionStorage.setItem("pendingBooking", JSON.stringify(bookingData));

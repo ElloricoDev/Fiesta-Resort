@@ -21,7 +21,7 @@
 <{{ $cardTag }} class="hotel-card" {!! $cardAttributes !!}>
   <div class="card-image">
     <img src="{{ asset('assets/' . $image) }}" alt="{{ $title }}" />
-    <div class="card-price">@if(is_numeric($price))${{ $price }} per night@else{{ $price }}@endif</div>
+    <div class="card-price">@if(is_numeric($price))₱{{ number_format($price, 0) }} per night@else{{ $price }}@endif</div>
     @if($badge)
       <div class="card-badge {{ strtolower($badge) }}">{{ $badge }}</div>
     @endif

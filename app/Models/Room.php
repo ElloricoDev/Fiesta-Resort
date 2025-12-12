@@ -32,6 +32,10 @@ class Room extends Model
 
     /**
      * Check if room is available for given dates
+     * 
+     * A room is unavailable if there's an overlapping reservation where:
+     * - The reservation check-in is before the requested check-out AND
+     * - The reservation check-out is after the requested check-in
      */
     public function isAvailableForDates($checkIn, $checkOut, $excludeReservationId = null): bool
     {
@@ -39,14 +43,16 @@ class Room extends Model
             return false;
         }
 
+        // Convert to date strings to ensure proper comparison
+        $checkInDate = is_string($checkIn) ? $checkIn : $checkIn->format('Y-m-d');
+        $checkOutDate = is_string($checkOut) ? $checkOut : $checkOut->format('Y-m-d');
+
         $query = $this->reservations()
-            ->where(function ($q) use ($checkIn, $checkOut) {
-                $q->whereBetween('check_in', [$checkIn, $checkOut])
-                  ->orWhereBetween('check_out', [$checkIn, $checkOut])
-                  ->orWhere(function ($q2) use ($checkIn, $checkOut) {
-                      $q2->where('check_in', '<=', $checkIn)
-                         ->where('check_out', '>=', $checkOut);
-                  });
+            ->where(function ($q) use ($checkInDate, $checkOutDate) {
+                // Check for overlapping reservations
+                // Reservation overlaps if: res_check_in < req_check_out AND res_check_out > req_check_in
+                $q->where('check_in', '<', $checkOutDate)
+                  ->where('check_out', '>', $checkInDate);
             })
             ->whereIn('status', ['pending', 'confirmed', 'checked-in']);
 

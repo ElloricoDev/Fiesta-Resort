@@ -1,6 +1,15 @@
 // Direct URLs and asset paths
 const fallbackImage = "/assets/FiestaResort1.jpg";
 
+// API base URL
+const apiBaseUrl = "/client/booking";
+
+// Get CSRF token from meta tag
+function getCsrfToken() {
+  const metaTag = document.querySelector('meta[name="csrf-token"]');
+  return metaTag ? metaTag.getAttribute("content") : "";
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   checkAuthentication();
   loadBookingData();
@@ -24,31 +33,45 @@ function checkAuthentication() {
   if (!isLoggedIn) {
     if (window.showError) window.showError("Please login to continue with booking");
     sessionStorage.setItem("redirectAfterLogin", window.location.href);
-    // Navigation handled by HTML - redirect via meta or let user navigate
     const loginLink = document.createElement("a");
     loginLink.href = "/login";
     loginLink.click();
   }
 }
 
-function loadBookingData() {
-  const bookingData = JSON.parse(sessionStorage.getItem("pendingBooking"));
+async function loadBookingData() {
+  const bookingData = JSON.parse(sessionStorage.getItem("pendingBooking") || "{}");
 
-  if (!bookingData) {
+  if (!bookingData || !bookingData.room) {
     if (window.showError) window.showError("No booking information found. Please go to home page.");
-    // Navigation handled by HTML links
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 2000);
     return;
   }
 
-  document.getElementById("hotelPreviewName").textContent =
-    bookingData.hotel || "Blue Origin Fams";
-  document.getElementById("hotelPreviewLocation").textContent =
-    bookingData.room?.location || "Galle, Sri Lanka";
-  document.getElementById("hotelPreviewImage").src =
-    bookingData.room?.image || fallbackImage;
+  // Update hotel preview
+  const hotelNameEl = document.getElementById("hotelPreviewName");
+  const hotelLocationEl = document.getElementById("hotelPreviewLocation");
+  const hotelImageEl = document.getElementById("hotelPreviewImage");
 
-  const pricePerNight = bookingData.room?.price || 200;
+  if (hotelNameEl) {
+    hotelNameEl.textContent = bookingData.room.title || bookingData.hotel || "Fiesta Resort";
+  }
+  if (hotelLocationEl) {
+    hotelLocationEl.textContent = bookingData.room.location || "Brgy. Ipil, Surigao City";
+  }
+  if (hotelImageEl) {
+    hotelImageEl.src = bookingData.room.image 
+      ? (bookingData.room.image.startsWith('/') ? bookingData.room.image : `/assets/${bookingData.room.image}`)
+      : fallbackImage;
+  }
+
+  // Set room type and price
+  window.bookingRoomType = bookingData.room.type || bookingData.room.roomType || "single";
+  const pricePerNight = bookingData.room.price || 2000;
   window.bookingPrice = pricePerNight;
+  
   updateTotalPrice();
 }
 
@@ -66,31 +89,91 @@ function initializeDatePicker() {
   dateInput.value = `${startDate} - ${endDate}`;
   window.checkInDate = tomorrow;
   window.checkOutDate = dayAfter;
+
+  // Make date input clickable to open date picker
+  dateInput.addEventListener("click", openDatePicker);
+}
+
+function openDatePicker() {
+  const checkInInput = document.getElementById("checkInDateInput");
+  const checkOutInput = document.getElementById("checkOutDateInput");
+  
+  if (!checkInInput || !checkOutInput) return;
+
+  // Set minimum dates
+  const today = new Date().toISOString().split('T')[0];
+  checkInInput.min = today;
+  checkOutInput.min = today;
+
+  // Set current values
+  checkInInput.value = formatDateForInput(window.checkInDate);
+  checkOutInput.value = formatDateForInput(window.checkOutDate);
+
+  // Show check-in picker first
+  checkInInput.showPicker?.() || checkInInput.click();
+  
+  checkInInput.addEventListener("change", function onCheckInChange() {
+    const checkIn = new Date(checkInInput.value);
+    window.checkInDate = checkIn;
+    
+    // Set minimum check-out to day after check-in
+    const nextDay = new Date(checkIn);
+    nextDay.setDate(nextDay.getDate() + 1);
+    checkOutInput.min = nextDay.toISOString().split('T')[0];
+    
+    // Auto-update check-out if it's before new minimum
+    if (checkOutInput.value && new Date(checkOutInput.value) <= checkIn) {
+      checkOutInput.value = nextDay.toISOString().split('T')[0];
+    }
+    
+    checkOutInput.showPicker?.() || checkOutInput.click();
+    
+    checkOutInput.addEventListener("change", function onCheckOutChange() {
+      const checkOut = new Date(checkOutInput.value);
+      
+      if (checkOut <= checkIn) {
+        if (window.showError) window.showError("Check-out date must be after check-in date.");
+        return;
+      }
+
+      window.checkOutDate = checkOut;
+      
+      const dateInput = document.getElementById("dateRange");
+      dateInput.value = `${formatDate(checkIn)} - ${formatDate(checkOut)}`;
+      
+      // Update days count based on actual dates
+      const days = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+      document.getElementById("daysCount").textContent = days;
+      
+      updateTotalPrice();
+      
+      // Remove listeners to prevent multiple triggers
+      checkInInput.removeEventListener("change", onCheckInChange);
+      checkOutInput.removeEventListener("change", onCheckOutChange);
+    }, { once: true });
+  }, { once: true });
 }
 
 function formatDate(date) {
   const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
   ];
   const day = date.getDate();
   const month = months[date.getMonth()];
   return `${day} ${month}`;
 }
 
+function formatDateForInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function updateTotalPrice() {
   const days = parseInt(document.getElementById("daysCount").textContent, 10);
-  const pricePerNight = window.bookingPrice || 200;
+  const pricePerNight = window.bookingPrice || 2000;
   const total = days * pricePerNight;
 
   document.getElementById("totalPrice").textContent = total.toLocaleString();
@@ -123,12 +206,21 @@ function setupEventListeners() {
     }
   });
 
-  document
-    .getElementById("continueToPayment")
-    .addEventListener("click", () => {
-      goToStep(2);
-      updatePaymentInfo();
-    });
+  document.getElementById("continueToPayment").addEventListener("click", () => {
+    // Validate dates
+    if (!window.checkInDate || !window.checkOutDate) {
+      if (window.showError) window.showError("Please select check-in and check-out dates.");
+      return;
+    }
+
+    if (window.checkOutDate <= window.checkInDate) {
+      if (window.showError) window.showError("Check-out date must be after check-in date.");
+      return;
+    }
+
+    goToStep(2);
+    updatePaymentInfo();
+  });
 
   const cancelBtn = document.getElementById("cancelBooking");
   const cancelBookingModal = document.getElementById("cancelBookingModal");
@@ -151,7 +243,7 @@ function setupEventListeners() {
     cancelBookingModalConfirmBtn.addEventListener("click", () => {
       sessionStorage.removeItem("pendingBooking");
       hideCancelBookingModal();
-      window.location.reload();
+      window.location.href = "/";
     });
   }
 
@@ -177,9 +269,9 @@ function setupEventListeners() {
     goToStep(1);
   });
 
-  document.getElementById("completePayment").addEventListener("click", () => {
+  document.getElementById("completePayment").addEventListener("click", async () => {
     if (validatePaymentForm()) {
-      processPayment();
+      await processPayment();
     }
   });
 }
@@ -232,85 +324,117 @@ function updateProgress(currentStep) {
 }
 
 function updatePaymentInfo() {
-  const bookingData = JSON.parse(sessionStorage.getItem("pendingBooking"));
+  const bookingData = JSON.parse(sessionStorage.getItem("pendingBooking") || "{}");
   const days = window.numberOfDays || 2;
-  const total = window.totalAmount || 1000;
-  const initial = Math.floor(total * 0.75);
+  const total = window.totalAmount || 2000;
 
-  document.getElementById("paymentDays").textContent = days;
-  document.getElementById("paymentHotel").textContent =
-    bookingData.hotel || "Blue Origin Fams";
-  document.getElementById("paymentLocation").textContent =
-    bookingData.room?.location || "Galle, Sri Lanka";
-  document.getElementById("paymentTotal").textContent = total;
-  document.getElementById("paymentInitial").textContent = initial;
+  const paymentDaysEl = document.getElementById("paymentDays");
+  const paymentHotelEl = document.getElementById("paymentHotel");
+  const paymentLocationEl = document.getElementById("paymentLocation");
+  const paymentTotalEl = document.getElementById("paymentTotal");
+
+  if (paymentDaysEl) paymentDaysEl.textContent = days;
+  if (paymentHotelEl) paymentHotelEl.textContent = bookingData.room?.title || bookingData.hotel || "Fiesta Resort";
+  if (paymentLocationEl) paymentLocationEl.textContent = bookingData.room?.location || "Brgy. Ipil, Surigao City";
+  if (paymentTotalEl) paymentTotalEl.textContent = total.toLocaleString();
 }
 
 function validatePaymentForm() {
-  const gcashNumber = document.getElementById("gcashNumber").value;
-  const bankName = document.getElementById("bankName").value;
-  const validationDate = document.getElementById("validationDate").value;
+  // All fields are now optional, but if provided, validate format
+  const contactNumber = document.getElementById("gcashNumber").value.trim();
+  const paymentMethod = document.getElementById("bankName").value;
+  const specialRequests = document.getElementById("validationDate").value.trim();
 
-  if (!gcashNumber) {
-    if (window.showError) window.showError("Please enter your GCASH number");
-    return false;
+  // If contact number is provided, validate format (Philippine numbers)
+  if (contactNumber) {
+    const phoneRegex = /^(09|\+639)\d{9}$/;
+    const cleanedNumber = contactNumber.replace(/\s+/g, '');
+    if (!phoneRegex.test(cleanedNumber)) {
+      if (window.showError) window.showError("Please enter a valid contact number (09XXXXXXXXX or +639XXXXXXXXX)");
+      return false;
+    }
   }
 
-  if (!bankName) {
-    if (window.showError) window.showError("Please select a bank");
-    return false;
-  }
-
-  if (!validationDate) {
-    if (window.showError) window.showError("Please select a validation date");
-    return false;
-  }
-
-  if (gcashNumber.length < 11) {
-    if (window.showError) window.showError("Please enter a valid GCASH number (11 digits)");
-    return false;
-  }
-
+  // All fields are optional, so validation always passes
   return true;
 }
 
-function processPayment() {
+async function processPayment() {
   const payBtn = document.getElementById("completePayment");
   const originalText = payBtn.textContent;
   payBtn.textContent = "Processing...";
   payBtn.disabled = true;
 
-  setTimeout(() => {
-    saveCompletedBooking();
+  try {
+    const bookingData = JSON.parse(sessionStorage.getItem("pendingBooking") || "{}");
+    const user = window.laravelAuth?.user;
+
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    if (!window.checkInDate || !window.checkOutDate) {
+      throw new Error("Please select check-in and check-out dates");
+    }
+
+    if (!window.bookingRoomType) {
+      throw new Error("Room type not specified");
+    }
+
+    const paymentMethod = document.getElementById("bankName").value;
+    const contactNumber = document.getElementById("gcashNumber").value.trim();
+    const specialRequests = document.getElementById("validationDate").value.trim();
+    
+    // Build notes from optional fields
+    const notesParts = [];
+    if (specialRequests) {
+      notesParts.push(specialRequests);
+    }
+    
+    const bookingPayload = {
+      room_type: window.bookingRoomType,
+      check_in: formatDateForInput(window.checkInDate),
+      check_out: formatDateForInput(window.checkOutDate),
+      guest_phone: contactNumber || user.phone || null,
+      payment_method: paymentMethod || null,
+      payment_number: contactNumber || null,
+      notes: notesParts.length > 0 ? notesParts.join("\n") : null,
+    };
+
+    const response = await fetch(apiBaseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRF-TOKEN": getCsrfToken(),
+      },
+      body: JSON.stringify(bookingPayload),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Failed to process booking");
+    }
+
+    if (window.showSuccess) {
+      window.showSuccess(result.message || "Booking submitted successfully!");
+    }
+
+    // Clear pending booking
+    sessionStorage.removeItem("pendingBooking");
+
+    // Go to success step
     goToStep(3);
+  } catch (error) {
+    console.error("Error processing booking:", error);
+    if (window.showError) {
+      window.showError(error.message || "Failed to process booking. Please try again.");
+    }
     payBtn.textContent = originalText;
     payBtn.disabled = false;
-    sessionStorage.removeItem("pendingBooking");
-  }, 2000);
-}
-
-function saveCompletedBooking() {
-  const bookingData = JSON.parse(sessionStorage.getItem("pendingBooking")) || {};
-  const userName = localStorage.getItem("userName") || "Guest";
-
-  const completedBooking = {
-    id: Date.now(),
-    user: userName,
-    hotel: bookingData.hotel,
-    room: bookingData.room?.title,
-    checkIn: window.checkInDate,
-    checkOut: window.checkOutDate,
-    days: window.numberOfDays,
-    total: window.totalAmount,
-    paymentMethod: document.getElementById("bankName").value,
-    bookingDate: new Date().toISOString(),
-    status: "confirmed",
-  };
-
-  let bookings = JSON.parse(localStorage.getItem("myBookings")) || [];
-  bookings.push(completedBooking);
-  localStorage.setItem("myBookings", JSON.stringify(bookings));
+  }
 }
 
 updateProgress(1);
-

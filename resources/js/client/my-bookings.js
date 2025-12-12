@@ -10,6 +10,15 @@ const assetUrl = (key, fallback = "/assets/FiestaResort1.jpg") => {
   return assets[key] || fallback;
 };
 
+// API base URL
+const apiBaseUrl = "/client/bookings";
+
+// Get CSRF token from meta tag
+function getCsrfToken() {
+  const metaTag = document.querySelector('meta[name="csrf-token"]');
+  return metaTag ? metaTag.getAttribute("content") : "";
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   checkAuthentication();
   loadBookings();
@@ -34,7 +43,6 @@ function checkAuthentication() {
     if (window.showError) {
       window.showError("Please login to view your bookings");
     }
-    // Navigation handled by HTML - redirect via meta or link
     const loginLink = document.createElement("a");
     loginLink.href = "/login";
     document.body.appendChild(loginLink);
@@ -43,22 +51,93 @@ function checkAuthentication() {
   }
 }
 
-function loadBookings(filter = "all") {
+// Load bookings from API
+async function loadBookings(filter = "all") {
   const bookingsList = document.getElementById("bookingsList");
   const emptyState = document.getElementById("emptyState");
-  const userEmail = localStorage.getItem("userEmail");
 
-  let bookings = JSON.parse(localStorage.getItem("userBookings")) || [];
+  if (!bookingsList || !emptyState) return;
+
+  try {
+    const url = apiBaseUrl || "/client/bookings";
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      credentials: "same-origin",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to load bookings");
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.data) {
+      let bookings = result.data;
+
+      // Filter bookings
+      if (filter !== "all") {
+        const filterMap = {
+          'upcoming': ['pending', 'confirmed'],
+          'completed': ['checked-in'],
+          'cancelled': ['cancelled'],
+        };
+        
+        const statuses = filterMap[filter] || [filter];
+        bookings = bookings.filter(booking => 
+          statuses.includes(booking.statusKey?.toLowerCase() || booking.status?.toLowerCase())
+        );
+      }
+
+      bookingsList.innerHTML = "";
+
+      if (bookings.length === 0) {
+        emptyState.style.display = "block";
+        bookingsList.style.display = "none";
+      } else {
+        emptyState.style.display = "none";
+        bookingsList.style.display = "grid";
+
+        bookings.forEach((booking) => {
+          const bookingCard = createBookingCard(booking);
+          bookingsList.appendChild(bookingCard);
+        });
+        
+        attachBookingEventListeners();
+      }
+    } else {
+      // Fallback to localStorage
+      loadBookingsFromLocalStorage(filter);
+    }
+  } catch (error) {
+    console.error("Error loading bookings:", error);
+    // Fallback to localStorage
+    loadBookingsFromLocalStorage(filter);
+  }
+}
+
+// Fallback to localStorage
+function loadBookingsFromLocalStorage(filter = "all") {
+  const bookingsList = document.getElementById("bookingsList");
+  const emptyState = document.getElementById("emptyState");
+  const userEmail = window.laravelAuth?.user?.email || localStorage.getItem("userEmail");
+
+  if (!bookingsList || !emptyState) return;
+
+  let bookings = JSON.parse(localStorage.getItem("myBookings") || "[]");
 
   if (bookings.length === 0) {
     bookings = generateSampleBookings(userEmail);
-    localStorage.setItem("userBookings", JSON.stringify(bookings));
+    localStorage.setItem("myBookings", JSON.stringify(bookings));
   }
 
   let filteredBookings = bookings;
   if (filter !== "all") {
     filteredBookings = bookings.filter(
-      (booking) => booking.status.toLowerCase() === filter
+      (booking) => booking.status?.toLowerCase() === filter
     );
   }
 
@@ -76,7 +155,6 @@ function loadBookings(filter = "all") {
       bookingsList.appendChild(bookingCard);
     });
     
-    // Attach event listeners to buttons
     attachBookingEventListeners();
   }
 }
@@ -86,58 +164,52 @@ function createBookingCard(booking) {
   card.className = "booking-card";
   card.setAttribute("data-booking-id", booking.id);
 
-  const statusClass = booking.status.toLowerCase().replace(/\s+/g, "-");
-  const checkInDate = new Date(booking.checkIn);
-  const checkOutDate = new Date(booking.checkOut);
-  const nights = Math.ceil(
+  const statusKey = booking.statusKey || booking.status?.toLowerCase() || 'pending';
+  const statusClass = statusKey.replace(/\s+/g, "-");
+  const checkInDate = new Date(booking.checkIn || booking.check_in);
+  const checkOutDate = new Date(booking.checkOut || booking.check_out);
+  const nights = booking.nights || Math.ceil(
     (checkOutDate - checkInDate) / (1000 * 60 * 60 * 24)
   );
+  const displayStatus = booking.status || 'Pending';
 
   card.innerHTML = `
     <div class="booking-card-content">
       <div class="booking-image">
-        <img src="${booking.image}" alt="${booking.hotel}" />
+        <img src="${booking.image || assetUrl('resort1')}" alt="${booking.hotel || 'Hotel'}" />
       </div>
 
       <div class="booking-info">
         <div class="booking-header">
           <div>
-            <h3 class="booking-title">${booking.hotel}</h3>
+            <h3 class="booking-title">${booking.hotel || booking.roomType || 'Hotel'}</h3>
             <div class="booking-location">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                 <circle cx="12" cy="10" r="3"></circle>
               </svg>
-              ${booking.location}
+              ${booking.location || 'Brgy. Ipil, Surigao City'}
             </div>
           </div>
-          <span class="booking-status ${statusClass}">${booking.status}</span>
+          <span class="booking-status ${statusClass}">${displayStatus}</span>
         </div>
 
         <div class="booking-details-grid">
           <div class="booking-detail">
             <span class="booking-detail-label">Check-in</span>
-            <span class="booking-detail-value">${formatDate(
-              booking.checkIn
-            )}</span>
+            <span class="booking-detail-value">${formatDate(booking.checkIn || booking.check_in)}</span>
           </div>
           <div class="booking-detail">
             <span class="booking-detail-label">Check-out</span>
-            <span class="booking-detail-value">${formatDate(
-              booking.checkOut
-            )}</span>
+            <span class="booking-detail-value">${formatDate(booking.checkOut || booking.check_out)}</span>
           </div>
           <div class="booking-detail">
             <span class="booking-detail-label">Guests</span>
-            <span class="booking-detail-value">${booking.guests} ${
-    booking.guests > 1 ? "Guests" : "Guest"
-  }</span>
+            <span class="booking-detail-value">${booking.guests || 2} ${booking.guests > 1 ? "Guests" : "Guest"}</span>
           </div>
           <div class="booking-detail">
             <span class="booking-detail-label">Nights</span>
-            <span class="booking-detail-value">${nights} ${
-    nights > 1 ? "Nights" : "Night"
-  }</span>
+            <span class="booking-detail-value">${nights} ${nights > 1 ? "Nights" : "Night"}</span>
           </div>
         </div>
 
@@ -145,11 +217,9 @@ function createBookingCard(booking) {
       </div>
 
       <div class="booking-actions">
-        <button class="btn btn-primary view-details-btn" data-booking-id="${
-          booking.id
-        }" type="button">View Details</button>
+        <button class="btn btn-primary view-details-btn" data-booking-id="${booking.id}" type="button">View Details</button>
         ${
-          booking.status === "Upcoming" || booking.status === "Confirmed"
+          (statusKey === "pending" || statusKey === "confirmed" || displayStatus === "Upcoming" || displayStatus === "Confirmed")
             ? `<button class="btn btn-secondary modify-booking-btn" data-booking-id="${booking.id}" type="button">
                 Modify
               </button>
@@ -166,7 +236,6 @@ function createBookingCard(booking) {
 }
 
 function attachBookingEventListeners() {
-  // View Details buttons
   const viewDetailsButtons = document.querySelectorAll(".view-details-btn");
   viewDetailsButtons.forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -175,7 +244,6 @@ function attachBookingEventListeners() {
     });
   });
 
-  // Modify buttons
   const modifyButtons = document.querySelectorAll(".modify-booking-btn");
   modifyButtons.forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -184,7 +252,6 @@ function attachBookingEventListeners() {
     });
   });
 
-  // Cancel buttons
   const cancelButtons = document.querySelectorAll(".cancel-booking-btn");
   cancelButtons.forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -195,7 +262,9 @@ function attachBookingEventListeners() {
 }
 
 function formatDate(dateString) {
+  if (!dateString) return "N/A";
   const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "N/A";
   const options = { month: "short", day: "numeric", year: "numeric" };
   return date.toLocaleDateString("en-US", options);
 }
@@ -213,33 +282,85 @@ function setupFilters() {
   });
 }
 
-function viewBookingDetails(bookingId) {
-  const bookings = JSON.parse(localStorage.getItem("userBookings")) || [];
-  const booking = bookings.find((b) => b.id === bookingId);
+async function viewBookingDetails(bookingId) {
+  try {
+    const url = apiBaseUrl || "/client/bookings";
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      credentials: "same-origin",
+    });
 
-  if (!booking) return;
+    let booking = null;
 
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success && result.data) {
+        booking = result.data.find(b => b.id == bookingId);
+      }
+    }
+
+    // Fallback to localStorage if API fails or booking not found
+    if (!booking) {
+      const bookings = JSON.parse(localStorage.getItem("myBookings") || "[]");
+      booking = bookings.find((b) => b.id == bookingId);
+    }
+
+    if (!booking) {
+      if (window.showError) window.showError("Booking not found");
+      return;
+    }
+
+    showBookingModal(booking);
+  } catch (error) {
+    console.error("Error loading booking details:", error);
+    // Fallback to localStorage
+    const bookings = JSON.parse(localStorage.getItem("myBookings") || "[]");
+    const booking = bookings.find((b) => b.id == bookingId);
+    if (booking) {
+      showBookingModal(booking);
+    } else {
+      if (window.showError) window.showError("Failed to load booking details");
+    }
+  }
+}
+
+function showBookingModal(booking) {
   const modal = document.getElementById("bookingModal");
   const modalBody = document.getElementById("modalBody");
 
-  const checkInDate = new Date(booking.checkIn);
-  const checkOutDate = new Date(booking.checkOut);
-  const nights = Math.ceil(
+  if (!modal || !modalBody) return;
+
+  const checkInDate = new Date(booking.checkIn || booking.check_in);
+  const checkOutDate = new Date(booking.checkOut || booking.check_out);
+  const nights = booking.nights || Math.ceil(
     (checkOutDate - checkInDate) / (1000 * 60 * 60 * 24)
   );
-  const statusClass = booking.status.toLowerCase().replace(/\s+/g, "-");
+  const statusKey = booking.statusKey || booking.status?.toLowerCase() || 'pending';
+  const statusClass = statusKey.replace(/\s+/g, "-");
+  const displayStatus = booking.status || 'Pending';
   
-  // Normalize booking data to handle different structures
+  // Normalize booking data
   const normalizedBooking = {
-    hotel: booking.hotel || "Unknown Hotel",
-    location: booking.location || "Unknown Location",
+    hotel: booking.hotel || booking.roomType || "Unknown Hotel",
+    location: booking.location || "Brgy. Ipil, Surigao City",
     image: booking.image || assetUrl("resort1"),
     roomType: booking.roomType || booking.room?.title || "Standard Room",
-    guestName: booking.guestName || localStorage.getItem("userName") || "Guest",
-    guestEmail: booking.guestEmail || localStorage.getItem("userEmail") || "guest@example.com",
-    guestPhone: booking.guestPhone || "+1 (555) 000-0000",
-    totalPrice: booking.totalPrice || booking.room?.price * (booking.days || nights) || 0,
-    ...booking
+    guestName: booking.guestName || booking.guest_name || window.laravelAuth?.user?.name || "Guest",
+    guestEmail: booking.guestEmail || booking.guest_email || window.laravelAuth?.user?.email || "guest@example.com",
+    guestPhone: booking.guestPhone || booking.guest_phone || "",
+    totalPrice: parseFloat(booking.totalPrice || booking.total_price || 0),
+    checkIn: booking.checkIn || booking.check_in,
+    checkOut: booking.checkOut || booking.check_out,
+    guests: booking.guests || 2,
+    status: displayStatus,
+    statusKey: statusKey,
+    id: booking.id,
+    bookingDate: booking.bookingDate || booking.created_at || booking.checkIn || booking.check_in,
+    roomNumber: booking.roomNumber || booking.room_number || null,
   };
 
   modalBody.innerHTML = `
@@ -256,9 +377,8 @@ function viewBookingDetails(bookingId) {
         </svg>
         ${normalizedBooking.location}
       </div>
-      <span class="booking-status ${statusClass}" style="margin-top: 12px; display: inline-block;">${
-    normalizedBooking.status
-  }</span>
+      ${normalizedBooking.roomNumber ? `<div style="margin-top: 8px; color: #64748b;">Room: ${normalizedBooking.roomNumber}</div>` : ''}
+      <span class="booking-status ${statusClass}" style="margin-top: 12px; display: inline-block;">${normalizedBooking.status}</span>
     </div>
 
     <div class="modal-section">
@@ -270,9 +390,7 @@ function viewBookingDetails(bookingId) {
         </div>
         <div class="modal-detail">
           <span class="modal-detail-label">Booking Date</span>
-          <span class="modal-detail-value">${formatDate(
-            normalizedBooking.bookingDate || normalizedBooking.checkIn
-          )}</span>
+          <span class="modal-detail-value">${formatDate(normalizedBooking.bookingDate)}</span>
         </div>
         <div class="modal-detail">
           <span class="modal-detail-label">Check-in</span>
@@ -280,21 +398,15 @@ function viewBookingDetails(bookingId) {
         </div>
         <div class="modal-detail">
           <span class="modal-detail-label">Check-out</span>
-          <span class="modal-detail-value">${formatDate(
-            normalizedBooking.checkOut
-          )}</span>
+          <span class="modal-detail-value">${formatDate(normalizedBooking.checkOut)}</span>
         </div>
         <div class="modal-detail">
           <span class="modal-detail-label">Number of Nights</span>
-          <span class="modal-detail-value">${nights} ${
-    nights > 1 ? "Nights" : "Night"
-  }</span>
+          <span class="modal-detail-value">${nights} ${nights > 1 ? "Nights" : "Night"}</span>
         </div>
         <div class="modal-detail">
           <span class="modal-detail-label">Guests</span>
-          <span class="modal-detail-value">${normalizedBooking.guests} ${
-    normalizedBooking.guests > 1 ? "Guests" : "Guest"
-  }</span>
+          <span class="modal-detail-value">${normalizedBooking.guests} ${normalizedBooking.guests > 1 ? "Guests" : "Guest"}</span>
         </div>
       </div>
     </div>
@@ -310,10 +422,12 @@ function viewBookingDetails(bookingId) {
           <span class="modal-detail-label">Email</span>
           <span class="modal-detail-value">${normalizedBooking.guestEmail}</span>
         </div>
+        ${normalizedBooking.guestPhone ? `
         <div class="modal-detail">
           <span class="modal-detail-label">Phone</span>
           <span class="modal-detail-value">${normalizedBooking.guestPhone}</span>
         </div>
+        ` : ''}
         <div class="modal-detail">
           <span class="modal-detail-label">Room Type</span>
           <span class="modal-detail-value">${normalizedBooking.roomType}</span>
@@ -323,14 +437,14 @@ function viewBookingDetails(bookingId) {
 
     <div class="modal-price">
       <span class="modal-price-label">Total Amount</span>
-      <span class="modal-price-value">$${parseFloat(normalizedBooking.totalPrice || 0).toFixed(2)}</span>
+      <span class="modal-price-value">₱${normalizedBooking.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
     </div>
 
     ${
-      (normalizedBooking.status === "Upcoming" || 
-       normalizedBooking.status === "Confirmed" || 
-       normalizedBooking.status === "upcoming" || 
-       normalizedBooking.status === "confirmed")
+      (normalizedBooking.statusKey === "pending" || 
+       normalizedBooking.statusKey === "confirmed" || 
+       normalizedBooking.status === "Upcoming" || 
+       normalizedBooking.status === "Confirmed")
         ? `<div class="modal-actions">
           <button class="btn btn-secondary modal-modify-btn" data-booking-id="${normalizedBooking.id}" type="button">
             Modify Booking
@@ -352,42 +466,48 @@ function viewBookingDetails(bookingId) {
   if (modalModifyBtn) {
     modalModifyBtn.addEventListener("click", () => {
       closeModal();
-      modifyBooking(bookingId);
+      modifyBooking(normalizedBooking.id);
     });
   }
   
   if (modalCancelBtn) {
     modalCancelBtn.addEventListener("click", () => {
-      cancelBooking(bookingId);
+      cancelBooking(normalizedBooking.id);
     });
   }
-  
-  // Store normalized booking for reference
-  modal._normalizedBooking = normalizedBooking;
 }
 
 function setupModal() {
   const modal = document.getElementById("bookingModal");
   const modalClose = document.getElementById("modalClose");
 
-  modalClose.addEventListener("click", closeModal);
+  if (modalClose) {
+    modalClose.addEventListener("click", closeModal);
+  }
 
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) {
-      closeModal();
-    }
-  });
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+  }
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && modal.classList.contains("show")) {
-      closeModal();
+    if (e.key === "Escape") {
+      const modal = document.getElementById("bookingModal");
+      if (modal && modal.classList.contains("show")) {
+        closeModal();
+      }
     }
   });
 }
 
 function closeModal() {
   const modal = document.getElementById("bookingModal");
-  modal.classList.remove("show");
+  if (modal) {
+    modal.classList.remove("show");
+  }
 }
 
 function modifyBooking(bookingId) {
@@ -416,14 +536,26 @@ function hideCancelBookingModal() {
 }
 
 if (cancelBookingModalConfirmBtn) {
-  cancelBookingModalConfirmBtn.addEventListener("click", () => {
+  cancelBookingModalConfirmBtn.addEventListener("click", async () => {
     if (pendingCancelBookingId) {
-      let bookings = JSON.parse(localStorage.getItem("userBookings")) || [];
-      const bookingIndex = bookings.findIndex((b) => b.id === pendingCancelBookingId);
+      try {
+        const url = (apiBaseUrl || "/client/bookings") + `/${pendingCancelBookingId}/cancel`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRF-TOKEN": getCsrfToken(),
+          },
+          credentials: "same-origin",
+        });
 
-      if (bookingIndex !== -1) {
-        bookings[bookingIndex].status = "Cancelled";
-        localStorage.setItem("userBookings", JSON.stringify(bookings));
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Failed to cancel booking");
+        }
 
         closeModal();
         hideCancelBookingModal();
@@ -434,7 +566,10 @@ if (cancelBookingModalConfirmBtn) {
           : "all";
         loadBookings(currentFilter);
 
-        if (window.showSuccess) window.showSuccess("Booking cancelled successfully");
+        if (window.showSuccess) window.showSuccess(result.message || "Booking cancelled successfully");
+      } catch (error) {
+        console.error("Error cancelling booking:", error);
+        if (window.showError) window.showError(error.message || "Failed to cancel booking. Please try again.");
       }
     }
   });
@@ -465,10 +600,10 @@ function generateSampleBookings(userEmail) {
   return [
     {
       id: "BR" + Math.random().toString(36).substr(2, 9).toUpperCase(),
-      hotel: "Blue Origin Farms",
-      location: "Galle, Sri Lanka",
+      hotel: "Fiesta Resort Main",
+      location: "Brgy. Ipil, Surigao City",
       image: assetUrl("resort1"),
-      roomType: "Deluxe Suite",
+      roomType: "Standard Room",
       checkIn: new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0],
@@ -478,54 +613,10 @@ function generateSampleBookings(userEmail) {
       guests: 2,
       guestName: capitalizedName,
       guestEmail: userEmail || "guest@example.com",
-      guestPhone: "+1 (555) 123-4567",
-      totalPrice: 450.0,
+      guestPhone: "+63 912 345 6789",
+      totalPrice: 4500.0,
       status: "Upcoming",
       bookingDate: new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-    },
-    {
-      id: "BR" + Math.random().toString(36).substr(2, 9).toUpperCase(),
-      hotel: "Ocean Land",
-      location: "Trincomalee, Sri Lanka",
-      image: assetUrl("resort2"),
-      roomType: "Ocean View Room",
-      checkIn: new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-      checkOut: new Date(today.getTime() - 12 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-      guests: 3,
-      guestName: capitalizedName,
-      guestEmail: userEmail || "guest@example.com",
-      guestPhone: "+1 (555) 123-4567",
-      totalPrice: 132.0,
-      status: "Completed",
-      bookingDate: new Date(today.getTime() - 20 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-    },
-    {
-      id: "BR" + Math.random().toString(36).substr(2, 9).toUpperCase(),
-      hotel: "Stark House",
-      location: "Dehiwala, Sri Lanka",
-      image: assetUrl("resort3"),
-      roomType: "Premium Suite",
-      checkIn: new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-      checkOut: new Date(today.getTime() + 25 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-      guests: 2,
-      guestName: capitalizedName,
-      guestEmail: userEmail || "guest@example.com",
-      guestPhone: "+1 (555) 123-4567",
-      totalPrice: 3424.0,
-      status: "Confirmed",
-      bookingDate: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0],
     },
@@ -536,4 +627,3 @@ window.viewBookingDetails = viewBookingDetails;
 window.modifyBooking = modifyBooking;
 window.cancelBooking = cancelBooking;
 window.closeModal = closeModal;
-

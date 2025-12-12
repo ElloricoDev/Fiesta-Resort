@@ -8,23 +8,62 @@ use Illuminate\Support\Facades\Route;
 // Client routes (public)
 Route::prefix('client')->name('client.')->group(function () {
     // Public routes - anyone can access
-    Route::view('/home', 'client.home')->name('home');
-    Route::view('/hotels', 'client.hotels')->name('hotels');
-    Route::view('/hotel-details', 'client.hotel-details')->name('hotel-details');
+    Route::get('/home', function () {
+        $stats = [
+            'totalUsers' => \App\Models\User::where('role', '!=', 'admin')->orWhereNull('role')->count(),
+            'totalRooms' => \App\Models\Room::where('status', 'available')->count(),
+            'totalReservations' => \App\Models\Reservation::whereIn('status', ['pending', 'confirmed', 'checked-in'])->count(),
+        ];
+        
+        return view('client.home', $stats);
+    })->name('home');
+    Route::get('/rooms', [App\Http\Controllers\Client\RoomController::class, 'index'])->name('rooms');
+    Route::get('/room-type-details', [App\Http\Controllers\Client\RoomController::class, 'show'])->name('room-type-details');
     Route::view('/room-details', 'client.room-details')->name('room-details');
     
     // Protected client routes - require auth but block admins
     Route::middleware(['auth', 'not.admin'])->group(function () {
         Route::view('/booking', 'client.booking')->name('booking');
         Route::view('/my-bookings', 'client.my-bookings')->name('my-bookings');
-        Route::view('/my-profile', 'client.my-profile')->name('my-profile');
+        Route::get('/my-profile', [App\Http\Controllers\Client\ProfileController::class, 'index'])->name('my-profile');
     });
 });
 
 // Root route - show client home
 Route::get('/', function () {
-    return view('client.home');
+    $stats = [
+        'totalUsers' => \App\Models\User::where('role', '!=', 'admin')->orWhereNull('role')->count(),
+        'totalRooms' => \App\Models\Room::where('status', 'available')->count(),
+        'totalReservations' => \App\Models\Reservation::whereIn('status', ['pending', 'confirmed', 'checked-in'])->count(),
+    ];
+    
+    return view('client.home', $stats);
 })->name('home');
+
+// Contact form route
+Route::post('/contact', [App\Http\Controllers\ContactController::class, 'store'])->name('contact.store');
+
+// Client booking routes - require authentication
+Route::middleware(['auth', 'not.admin'])->prefix('client')->name('client.')->group(function () {
+    Route::post('/booking', [App\Http\Controllers\Client\BookingController::class, 'store'])->name('booking.store');
+    Route::get('/booking/available-rooms', [App\Http\Controllers\Client\BookingController::class, 'getAvailableRooms'])->name('booking.available-rooms');
+    
+    // Client profile API routes
+    Route::get('/profile', [App\Http\Controllers\Client\ProfileController::class, 'get'])->name('profile.get');
+    Route::put('/profile', [App\Http\Controllers\Client\ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/password', [App\Http\Controllers\Client\ProfileController::class, 'changePassword'])->name('profile.password');
+    Route::get('/profile/stats', [App\Http\Controllers\Client\ProfileController::class, 'getStats'])->name('profile.stats');
+    Route::get('/profile/recent-bookings', [App\Http\Controllers\Client\ProfileController::class, 'getRecentBookings'])->name('profile.recent-bookings');
+    
+    // Client bookings API routes
+    Route::get('/bookings', [App\Http\Controllers\Client\BookingController::class, 'getBookings'])->name('bookings.get');
+    Route::post('/bookings/{id}/cancel', [App\Http\Controllers\Client\BookingController::class, 'cancelBooking'])->name('bookings.cancel');
+});
+
+// Client room routes - public
+Route::prefix('client')->name('client.')->group(function () {
+    Route::get('/rooms/list', [App\Http\Controllers\Client\RoomController::class, 'getRooms'])->name('rooms.list');
+});
 
 // Admin routes - require authentication and admin role
 Route::prefix('admin')
