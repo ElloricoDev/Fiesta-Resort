@@ -22,7 +22,7 @@
     </div>
   </section>
 
-  <section class="room-details-section">
+  <section class="room-details-section" data-rooms-list-url="{{ route('client.rooms.list') }}">
     <div class="room-details-container">
       <div class="room-header">
         <h1 class="room-title" id="roomTitle">Blue Origin Fams</h1>
@@ -120,18 +120,34 @@
               </x-slot:icon>
             </x-client.amenity-item>
           </div>
+
+          <!-- Available Rooms List -->
+          <div class="available-rooms-list" style="margin-top: 3rem;">
+            <h2 class="section-heading" style="margin-bottom: 1.5rem;">Available Rooms</h2>
+            <p class="section-description" style="margin-bottom: 1.5rem; color: #64748b;">
+              Select a specific room from the available options below:
+            </p>
+            <div id="roomsList" class="rooms-list-container" style="display: grid; gap: 1rem;">
+              <div class="loading-rooms" style="text-align: center; padding: 2rem; color: #64748b;">
+                Loading available rooms...
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="booking-card">
           <h3 class="booking-title">Start Booking</h3>
           <div class="price-display">
-            <span class="price-amount" id="priceAmount">$200</span>
-            <span class="price-period">per Day</span>
+            <span class="price-amount" id="priceAmount">₱0</span>
+            <span class="price-period">per night</span>
           </div>
-          <a href="{{ route('client.booking') }}" class="book-now-button" id="bookNowBtn" style="text-decoration: none; display: inline-block;">Book Now!</a>
+          <div id="selectedRoomInfo" style="margin: 1rem 0; padding: 0.75rem; background: #f8f9fa; border-radius: 8px; font-size: 0.9rem; color: #64748b; display: none;">
+            <strong>Selected:</strong> <span id="selectedRoomNumber">-</span>
+          </div>
+          <a href="{{ route('client.booking') }}" class="book-now-button" id="bookNowBtn" style="text-decoration: none; display: inline-block; opacity: 0.6; pointer-events: none;">Select a Room First</a>
           <div class="booking-info">
-            <p class="info-text">
-              You will be redirected to complete your booking
+            <p class="info-text" id="bookingInfoText">
+              Please select a room from the list below to proceed with booking
             </p>
           </div>
         </div>

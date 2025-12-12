@@ -27,13 +27,17 @@ document.addEventListener("DOMContentLoaded", async function () {
     ],
   };
 
+  let allRooms = [];
+  let selectedRoom = null;
+  const roomsListUrl = document.querySelector('.room-details-section')?.getAttribute('data-rooms-list-url') || '/rooms/list';
+
   async function fetchRoomData() {
     if (!roomTypeParam) {
       return fallbackRoom;
     }
 
     try {
-      const response = await fetch(`/rooms/list?room_type=${encodeURIComponent(roomTypeParam)}`, {
+      const response = await fetch(`${roomsListUrl}?room_type=${encodeURIComponent(roomTypeParam)}`, {
         headers: { "Accept": "application/json" },
       });
       const result = await response.json();
@@ -41,12 +45,13 @@ document.addEventListener("DOMContentLoaded", async function () {
         return fallbackRoom;
       }
 
-      const rooms = result.data;
-      if (!rooms.length) {
+      allRooms = result.data;
+      if (!allRooms.length) {
         return fallbackRoom;
       }
 
-      const room = rooms[0]; // first available room of that type
+      // Use first room for general info display
+      const room = allRooms[0];
       return {
         room_type: room.room_type,
         title: room.room_type,
@@ -71,6 +76,110 @@ document.addEventListener("DOMContentLoaded", async function () {
       console.error("Failed to load room data:", e);
       return fallbackRoom;
     }
+  }
+
+  function renderRoomsList() {
+    const roomsListContainer = document.getElementById("roomsList");
+    if (!roomsListContainer) return;
+
+    if (!allRooms || allRooms.length === 0) {
+      roomsListContainer.innerHTML = `
+        <div style="text-align: center; padding: 2rem; color: #64748b;">
+          <p>No rooms available for this type at the moment.</p>
+        </div>
+      `;
+      return;
+    }
+
+    roomsListContainer.innerHTML = allRooms.map((room, index) => {
+      const isSelected = selectedRoom && selectedRoom.id === room.id;
+      return `
+        <div class="room-item" 
+             data-room-id="${room.id}"
+             style="
+               padding: 1.25rem;
+               border: 2px solid ${isSelected ? '#4169e1' : '#e0e0e0'};
+               border-radius: 12px;
+               background: ${isSelected ? '#f0f4ff' : '#ffffff'};
+               cursor: pointer;
+               transition: all 0.3s ease;
+             "
+             onmouseover="this.style.borderColor='#4169e1'; this.style.boxShadow='0 4px 12px rgba(65, 105, 225, 0.15)'"
+             onmouseout="this.style.borderColor='${isSelected ? '#4169e1' : '#e0e0e0'}'; this.style.boxShadow='none'">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h4 style="margin: 0 0 0.5rem 0; color: #152c5b; font-size: 1.1rem;">
+                Room ${room.room_number}
+                ${isSelected ? '<span style="margin-left: 0.5rem; color: #4169e1; font-size: 0.9rem;">✓ Selected</span>' : ''}
+              </h4>
+              <p style="margin: 0.25rem 0; color: #64748b; font-size: 0.9rem;">
+                Max Occupancy: ${room.max_occupancy || 2} ${room.max_occupancy === 1 ? 'person' : 'people'}
+              </p>
+              ${room.description ? `<p style="margin: 0.5rem 0 0 0; color: #64748b; font-size: 0.85rem;">${room.description.substring(0, 100)}${room.description.length > 100 ? '...' : ''}</p>` : ''}
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 1.25rem; font-weight: 600; color: #152c5b;">
+                ₱${Number(room.price_per_night || 0).toLocaleString()}
+              </div>
+              <div style="font-size: 0.85rem; color: #64748b;">per night</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Add click handlers
+    roomsListContainer.querySelectorAll('.room-item').forEach(item => {
+      item.addEventListener('click', function() {
+        const roomId = parseInt(this.getAttribute('data-room-id'));
+        selectRoom(roomId);
+      });
+    });
+  }
+
+  function selectRoom(roomId) {
+    selectedRoom = allRooms.find(r => r.id === roomId);
+    if (!selectedRoom) return;
+
+    // Update UI
+    const priceAmountEl = document.getElementById("priceAmount");
+    const selectedRoomInfoEl = document.getElementById("selectedRoomInfo");
+    const selectedRoomNumberEl = document.getElementById("selectedRoomNumber");
+    const bookNowBtn = document.getElementById("bookNowBtn");
+    const bookingInfoText = document.getElementById("bookingInfoText");
+
+    if (priceAmountEl) {
+      priceAmountEl.textContent = `₱${Number(selectedRoom.price_per_night || 0).toLocaleString()}`;
+    }
+
+    if (selectedRoomInfoEl && selectedRoomNumberEl) {
+      selectedRoomInfoEl.style.display = 'block';
+      selectedRoomNumberEl.textContent = `Room ${selectedRoom.room_number} - ₱${Number(selectedRoom.price_per_night || 0).toLocaleString()}/night`;
+    }
+
+    if (bookNowBtn) {
+      bookNowBtn.style.opacity = '1';
+      bookNowBtn.style.pointerEvents = 'auto';
+      bookNowBtn.textContent = 'Book Now!';
+    }
+
+    if (bookingInfoText) {
+      bookingInfoText.textContent = 'You will be redirected to complete your booking';
+    }
+
+    // Store selected room for booking
+    sessionStorage.setItem("selectedRoom", JSON.stringify({
+      id: selectedRoom.id,
+      roomType: selectedRoom.room_type,
+      roomNumber: selectedRoom.room_number,
+      title: selectedRoom.room_type,
+      location: "Brgy. Ipil, Surigao City",
+      price: selectedRoom.price_per_night,
+      image: "/assets/FiestaResort1.jpg",
+    }));
+
+    // Re-render list to show selection
+    renderRoomsList();
   }
 
   async function loadRoomData() {
@@ -134,7 +243,10 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
   // Load room data on page load
-  loadRoomData();
+  loadRoomData().then(() => {
+    // After loading room data, render the rooms list
+    renderRoomsList();
+  });
 
   // Handle Book Now button - check login before allowing navigation
   const bookNowBtn = document.getElementById("bookNowBtn");
@@ -169,7 +281,23 @@ document.addEventListener("DOMContentLoaded", async function () {
         return;
       }
 
-      // User is logged in, proceed with booking
+      // User is logged in, check if room is selected
+      if (!selectedRoom) {
+        e.preventDefault();
+        if (window.showError) {
+          window.showError("Please select a room from the list below before booking");
+        } else {
+          alert("Please select a room from the list below before booking");
+        }
+        // Scroll to rooms list
+        const roomsList = document.getElementById("roomsList");
+        if (roomsList) {
+          roomsList.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return;
+      }
+
+      // User is logged in and room is selected, proceed with booking
       // Get room data and store for booking page
       const roomData = JSON.parse(sessionStorage.getItem("selectedRoom") || "{}");
       const bookingData = {

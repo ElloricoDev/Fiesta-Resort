@@ -67,9 +67,9 @@ async function loadBookingData() {
       : fallbackImage;
   }
 
-  // Set room type and price
-  window.bookingRoomType = bookingData.room.type || bookingData.room.roomType || "single";
-  const pricePerNight = bookingData.room.price || 2000;
+  // Set room type and price - use roomType from selected room
+  window.bookingRoomType = bookingData.room.roomType || bookingData.room.type || bookingData.room.room_type || "Standard Room";
+  const pricePerNight = bookingData.room.price || bookingData.room.price_per_night || 2000;
   window.bookingPrice = pricePerNight;
   
   updateTotalPrice();
