@@ -10,7 +10,6 @@
       'resources/js/client/home.js',
     ])
     @stack('styles')
-    @vite('resources/js/dummy-data.js')
     @php
       $userData = auth()->check() ? [
         'email' => auth()->user()->email,

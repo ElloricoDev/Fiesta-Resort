@@ -33,20 +33,14 @@ export default defineConfig({
                 // Client assets
                 'resources/css/client/home.css',
                 'resources/css/client/booking.css',
-                'resources/css/client/hotel-details.css',
-                'resources/css/client/hotels.css',
                 'resources/css/client/my-bookings.css',
                 'resources/css/client/my-profile.css',
                 'resources/css/client/room-details.css',
                 'resources/js/client/home.js',
                 'resources/js/client/booking.js',
-                'resources/js/client/hotel-details.js',
-                'resources/js/client/hotels.js',
                 'resources/js/client/my-bookings.js',
                 'resources/js/client/my-profile.js',
                 'resources/js/client/room-details.js',
-                // Dummy data seed script
-                'resources/js/dummy-data.js',
                 // Notification utility
                 'resources/js/utils/notifications.js',
             ],

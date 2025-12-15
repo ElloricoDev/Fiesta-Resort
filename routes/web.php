@@ -57,6 +57,7 @@ Route::middleware(['auth', 'not.admin'])->prefix('client')->name('client.')->gro
     
     // Client bookings API routes
     Route::get('/bookings', [App\Http\Controllers\Client\BookingController::class, 'getBookings'])->name('bookings.get');
+    Route::put('/bookings/{id}', [App\Http\Controllers\Client\BookingController::class, 'updateBooking'])->name('bookings.update');
     Route::post('/bookings/{id}/cancel', [App\Http\Controllers\Client\BookingController::class, 'cancelBooking'])->name('bookings.cancel');
 });
 
